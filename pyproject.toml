@@ -1,0 +1,15 @@
+[project]
+name = "family-tree"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.1",
+  "alembic>=1.13",
+  "pydantic>=2.0"
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
