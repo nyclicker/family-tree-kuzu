@@ -1,10 +1,14 @@
 from fastapi import FastAPI, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from .db import get_db
+
+from .db import get_db, engine
+from .models import Base
 from . import crud, schemas, graph
 
 app = FastAPI()
+
+Base.metadata.create_all(bind=engine)
 
 @app.get("/", include_in_schema=False)
 def ui():

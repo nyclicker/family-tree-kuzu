@@ -13,7 +13,7 @@ class Sex(enum.Enum):
 class RelType(enum.Enum):
     PARENT_OF = "PARENT_OF"
     SPOUSE_OF = "SPOUSE_OF"
-    SIBLING_OF = "SIBLING_OF"
+    CHIDL_OF = "CHILD_OF"
 
 class Person(Base):
     __tablename__ = "person"
