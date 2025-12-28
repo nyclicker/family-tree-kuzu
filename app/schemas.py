@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, Literal
 
 class PersonCreate(BaseModel):
@@ -15,8 +15,17 @@ class PersonOut(BaseModel):
 class RelCreate(BaseModel):
     from_person_id: str
     to_person_id: str
-    type: Literal["PARENT_OF","SPOUSE_OF","CHILD_OF"]
+    type: Literal["CHILD_OF","EARLIEST_ANCESTOR"]
 
-class GraphOut(BaseModel):
-    nodes: list[dict]
-    edges: list[dict]
+    @field_validator("to_person_id")
+    @classmethod
+    def validate_to_person_id(cls, v, info):
+        # if earliest ancestor, to_person_id must be empty
+        if info.data.get("type") == "EARLIEST_ANCESTOR":
+            return None
+        # if child_of, must provide parent id
+        if not v:
+            raise ValueError("to_person_id is required for CHILD_OF")
+        return v
+
+    

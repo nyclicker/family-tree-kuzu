@@ -7,7 +7,6 @@ from .models import Base
 from . import crud, schemas, graph
 
 app = FastAPI()
-
 Base.metadata.create_all(bind=engine)
 
 @app.get("/", include_in_schema=False)
@@ -30,10 +29,12 @@ def add_person(body: schemas.PersonCreate, db: Session = Depends(get_db)):
 def add_rel(body: schemas.RelCreate, db: Session = Depends(get_db)):
     return crud.create_relationship(db, body.from_person_id, body.to_person_id, body.type)
 
-@app.get("/graph", response_model=schemas.GraphOut)
-def get_graph(db: Session = Depends(get_db)):
-    return graph.build_graph(db)
+# ✅ NEW: Plotly figure JSON
+@app.get("/api/plotly")
+def get_plotly(db: Session = Depends(get_db)):
+    return graph.build_plotly_graph_json(db)
 
 @app.get("/health")
 def health():
     return {"ok": True}
+

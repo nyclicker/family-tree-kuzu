@@ -1,5 +1,3 @@
-let cy;
-
 async function fetchJSON(url, opts) {
   const r = await fetch(url, opts);
   if (!r.ok) throw new Error(await r.text());
@@ -28,44 +26,8 @@ async function refreshPeopleDropdowns() {
 }
 
 async function drawGraph() {
-  const g = await fetchJSON("/graph");
-
-  const elements = [...g.nodes, ...g.edges];
-
-  if (!cy) {
-    cy = cytoscape({
-      container: document.getElementById("cy"),
-      elements,
-      layout: { name: "breadthfirst", directed: true, padding: 20 },
-      style: [
-        {
-          selector: "node",
-          style: {
-            "label": "data(label)",
-            "text-wrap": "wrap",
-            "text-max-width": 140,
-            "text-valign": "center",
-            "text-halign": "center",
-            "padding": "10px",
-            "shape": "round-rectangle",
-          }
-        },
-        {
-          selector: "edge",
-          style: {
-            "curve-style": "bezier",
-            "target-arrow-shape": "triangle",
-            "label": "data(type)",
-            "font-size": 10
-          }
-        }
-      ]
-    });
-  } else {
-    cy.elements().remove();
-    cy.add(elements);
-    cy.layout({ name: "breadthfirst", directed: true, padding: 20 }).run();
-  }
+  const fig = await fetchJSON("/api/plotly");
+  Plotly.newPlot("graph", fig.data, fig.layout, fig.config || { responsive: true });
 }
 
 document.getElementById("addPerson").onclick = async () => {
@@ -86,15 +48,18 @@ document.getElementById("addPerson").onclick = async () => {
 
 document.getElementById("addRel").onclick = async () => {
   const from = document.getElementById("from").value;
-  const to = document.getElementById("to").value;
   const type = document.getElementById("type").value;
 
-  if (!from || !to || from === to) return;
+  // If EARLIEST_ANCESTOR, do not send to_person_id
+  const payload =
+    type === "EARLIEST_ANCESTOR"
+      ? { from_person_id: from, type }
+      : { from_person_id: from, to_person_id: document.getElementById("to").value, type };
 
   await fetchJSON("/relationships", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ from_person_id: from, to_person_id: to, type })
+    body: JSON.stringify(payload)
   });
 
   await drawGraph();

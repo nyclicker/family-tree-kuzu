@@ -11,9 +11,8 @@ class Sex(enum.Enum):
     U = "U"
 
 class RelType(enum.Enum):
-    PARENT_OF = "PARENT_OF"
-    SPOUSE_OF = "SPOUSE_OF"
-    CHIDL_OF = "CHILD_OF"
+    CHILD_OF = "CHILD_OF"
+    EARLIEST_ANCESTOR = "EARLIEST_ANCESTOR"
 
 class Person(Base):
     __tablename__ = "person"
@@ -28,7 +27,11 @@ class Relationship(Base):
     __tablename__ = "relationship"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     from_person_id: Mapped[str] = mapped_column(String(36), ForeignKey("person.id"), nullable=False)
-    to_person_id: Mapped[str] = mapped_column(String(36), ForeignKey("person.id"), nullable=False)
+
+    # ✅ allow NULL for EARLIEST_ANCESTOR
+    to_person_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("person.id"), nullable=True)
+
     type: Mapped[RelType] = mapped_column(Enum(RelType), nullable=False)
+
     from_person = relationship("Person", foreign_keys=[from_person_id])
     to_person = relationship("Person", foreign_keys=[to_person_id])
