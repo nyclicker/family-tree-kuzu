@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from plotly import graph_objects as go
 from fastapi.responses import JSONResponse
 import json
-
 from .legacy_io import LegacyRow
 from .normalize import normalize_person
 from .layout import radial_tree_layout_balanced_spaced
 from .colors import build_sibling_colors
-
+from app.models import Person, Relationship, RelType
 
 def build_maps(rows: List[LegacyRow]):
     children_map: Dict[str, List[str]] = {}
@@ -70,9 +69,174 @@ def build_maps(rows: List[LegacyRow]):
 
     return children_map, parents_map, gender_map, display_name, hover_name, roots
 
+def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], layer_gap: float = 4.0) -> go.Figure:
+    children_map, parents_map, gender_map, display_name, hover_name, roots = build_maps_from_db(people, rels)
 
-def build_plotly_figure(rows: List[LegacyRow], layer_gap: float = 4.0) -> go.Figure:
-    children_map, parents_map, gender_map, display_name, hover_name, roots = build_maps(rows)
+    if not roots:
+        fig = go.Figure()
+        fig.update_layout(title="No family data found")
+        return fig
+
+    # Debug if we're using IDs
+    # sanity checks
+    print("DEBUG: Checking IDs...")
+    assert all(isinstance(k, str) for k in children_map.keys())
+    for p, kids in children_map.items():
+        for c in kids:
+            assert isinstance(c, str)
+
+    # do all ids referenced by rels exist in people?
+    people_ids = {str(p.id) for p in people}
+    dangling = []
+    for parent, kids in children_map.items():
+        if parent not in people_ids:
+            dangling.append(("parent", parent))
+        for child in kids:
+            if child not in people_ids:
+                dangling.append(("child", child))
+
+    if dangling:
+        print("DANGLING IDS:", dangling[:20])
+
+    print("DEBUG: ID checks passed.")
+    # End Debug Code
+
+    pos = radial_tree_layout_balanced_spaced(children_map, roots, layer_gap=layer_gap)
+
+    # --- OPTIONAL: index relationships by (parent_id, child_id) so edges can carry rel IDs
+    rel_id_by_pair = {}
+    for r in rels:
+        # If your rels are CHILD_OF (child -> parent)
+        if str(r.type) == "RelType.CHILD_OF" or getattr(r.type, "value", None) == "CHILD_OF":
+            child_id = r.from_person_id
+            parent_id = r.to_person_id
+            rel_id_by_pair[(parent_id, child_id)] = r.id
+
+    edge_x, edge_y = [], []
+    edge_customdata = []  # <-- NEW: rel metadata aligned to segments
+
+    for parent_id, kids in children_map.items():
+        for child_id in kids:
+            if parent_id in pos and child_id in pos:
+                x0, y0 = pos[parent_id]
+                x1, y1 = pos[child_id]
+                edge_x += [x0, x1, None]
+                edge_y += [y0, y1, None]
+
+                # one entry per point (including the None break) so it stays aligned
+                rid = rel_id_by_pair.get((parent_id, child_id))
+                edge_customdata += [
+                    {"relationship_id": rid, "parent_id": parent_id, "child_id": child_id},
+                    {"relationship_id": rid, "parent_id": parent_id, "child_id": child_id},
+                    None,
+                ]
+
+    edge_trace = go.Scatter(
+        x=edge_x,
+        y=edge_y,
+        mode="lines",
+        line=dict(width=1, color="gray"),
+        hoverinfo="none",
+        customdata=edge_customdata,  # <-- NEW (optional)
+    )
+
+    nodes = list(pos.keys())  # these are person_ids
+    node_colors = build_sibling_colors(nodes, children_map, parents_map, gender_map)
+
+    node_x, node_y, texts, hover_texts, node_customdata = [], [], [], [], []  # <-- NEW
+
+    for person_id in nodes:
+        x, y = pos[person_id]
+        node_x.append(x)
+        node_y.append(y)
+
+        # UI label still uses name
+        short_label = display_name.get(person_id, person_id).replace("\n", "<br>")
+        texts.append(short_label)
+
+        hover_label = hover_name.get(person_id, short_label).replace("\n", "<br>")
+        hover_texts.append(hover_label)
+
+        # <-- NEW: attach IDs (and anything else you want)
+        node_customdata.append({
+            "person_id": person_id,
+            "label": display_name.get(person_id, None),
+        })
+
+    node_trace = go.Scatter(
+        x=node_x,
+        y=node_y,
+        mode="markers+text",
+        text=texts,                       # what user sees
+        textposition="top center",
+        hoverinfo="text",
+        hovertext=hover_texts,            # what user sees on hover
+        customdata=node_customdata,       # <-- NEW: your true IDs live here
+        marker=dict(size=18, color=node_colors, line=dict(width=1, color="#333")),
+        textfont=dict(size=9),
+    )
+
+    fig = go.Figure(data=[edge_trace, node_trace])
+    # optional: make it easier to reference IDs on click in JS
+    fig.update_layout(clickmode="event+select")
+    return fig
+
+def build_maps_from_db(
+    people: List[Person],
+    rels: List[Relationship],
+) -> Tuple[
+    Dict[str, List[str]],  # children_map (parent_id -> [child_id])
+    Dict[str, List[str]],  # parents_map  (child_id  -> [parent_id])
+    Dict[str, str],        # gender_map   (person_id -> "M"/"F"/"U")
+    Dict[str, str],        # display_name (person_id -> label)
+    Dict[str, str],        # hover_name   (person_id -> hover label)
+    List[str],             # roots        ([root_id])
+]:
+    children_map: Dict[str, List[str]] = {}
+    parents_map: Dict[str, List[str]] = {}
+    gender_map: Dict[str, str] = {}
+    display_name: Dict[str, str] = {}
+    hover_name: Dict[str, str] = {}
+
+    # people maps
+    for p in people:
+        pid = str(p.id)
+        display_name[pid] = p.display_name or pid
+        hover_name[pid] = (p.display_name or pid)
+        if getattr(p, "sex", None):
+            gender_map[pid] = str(p.sex.value) if hasattr(p.sex, "value") else str(p.sex)
+
+    # relationships
+    explicit_roots: List[str] = []
+    for r in rels:
+        a = str(r.from_person_id)
+        b = str(r.to_person_id)
+
+        if r.type == RelType.EARLIEST_ANCESTOR:
+            # convention: from_person is the root; to_person can be ignored or set to self
+            explicit_roots.append(a)
+
+        elif r.type == RelType.CHILD_OF:
+            # convention: from_person is the child, to_person is the parent
+            child_id, parent_id = a, b
+            children_map.setdefault(parent_id, []).append(child_id)
+            parents_map.setdefault(child_id, []).append(parent_id)
+
+    # pick roots
+    roots = explicit_roots[:]
+
+    # if no explicit roots, infer: nodes with no parents
+    if not roots:
+        all_ids = {str(p.id) for p in people}
+        child_ids = set(parents_map.keys())
+        roots = sorted(list(all_ids - child_ids))
+
+    return children_map, parents_map, gender_map, display_name, hover_name, roots
+
+
+"""
+def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], layer_gap: float = 4.0) -> go.Figure:
+    children_map, parents_map, gender_map, display_name, hover_name, roots = build_maps_from_db(people, rels)
 
     if not roots:
         fig = go.Figure()
@@ -163,4 +327,34 @@ def write_html(fig: go.Figure, out_path: str) -> None:
     config = {"scrollZoom": True, "displayModeBar": True, "responsive": True}
     fig.write_html(out_path, include_plotlyjs="cdn", full_html=True, config=config)
 
+def build_maps_from_db(
+    people: List[Person],
+    rels: List[Relationship],
+) -> Tuple[Dict[str, List[str]], Dict[str, List[str]], Dict[str, str], Dict[str, str], Dict[str, str], List[str]]:
+    children_map: Dict[str, List[str]] = {}
+    parents_map: Dict[str, List[str]] = {}
+    gender_map: Dict[str, str] = {}
+    display_name: Dict[str, str] = {}
+    hover_name: Dict[str, str] = {}
+    roots: List[str] = []
 
+    # People: keyed by person.id
+    for p in people:
+        display_name[p.id] = p.display_name
+        hover_name[p.id] = p.display_name  # or richer hover later
+        gender_map[p.id] = (p.sex.value if p.sex else "U")
+
+    # Relationships: use ids directly
+    for r in rels:
+        if r.type == RelType.CHILD_OF:
+            # child = from_person_id, parent = to_person_id
+            children_map.setdefault(r.to_person_id, []).append(r.from_person_id)
+            parents_map.setdefault(r.from_person_id, []).append(r.to_person_id)
+
+        elif r.type == RelType.EARLIEST_ANCESTOR:
+            # simplest convention: root stored as self-link (from == to)
+            roots.append(r.from_person_id)
+
+    return children_map, parents_map, gender_map, display_name, hover_name, roots
+
+"""

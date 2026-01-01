@@ -26,9 +26,11 @@ async function refreshPeopleDropdowns() {
 }
 
 async function drawGraph() {
-  const fig = await fetchJSON("/api/plotly");
-  Plotly.newPlot("graph", fig.data, fig.layout, fig.config || { responsive: true });
+  const res = await fetch("/api/plotly");
+  const fig = await res.json();
+  Plotly.newPlot("graph", fig.data, fig.layout, fig.config || {});
 }
+
 
 document.getElementById("addPerson").onclick = async () => {
   const name = document.getElementById("name").value.trim();

@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
 from .models import Person, Relationship, RelType
-from .plotly_graph.plotly_render import build_plotly_figure
+from .plotly_graph.plotly_render import build_plotly_figure_from_db
 from .plotly_graph.legacy_io import LegacyRow
-
 
 def build_graph(db: Session):
     people = {p.id: p for p in db.query(Person).all()}
@@ -80,8 +79,17 @@ def _db_to_legacy_rows(db: Session) -> list[LegacyRow]:
 
     return rows
 
+def build_plotly_figure_json(db: Session, layer_gap: float = 4.0) -> dict:
+    people = db.query(Person).all()
+    rels = db.query(Relationship).all()
+
+    fig = build_plotly_figure_from_db(people, rels, layer_gap=layer_gap)
+    return fig.to_dict()
+
+"""
 def build_plotly_graph_json(db: Session, layer_gap: float = 4.0) -> dict:
     rows = _db_to_legacy_rows(db)
     fig = build_plotly_figure(rows, layer_gap=layer_gap)
     # Return JSON for Plotly.newPlot(...)
     return fig.to_plotly_json()
+"""

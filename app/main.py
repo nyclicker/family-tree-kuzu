@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from .db import get_db, engine
 from .models import Base
 from . import crud, schemas, graph
+#from .plotly_graph.db_plotly import build_plotly_figure_from_db
+#from .plotly_graph.plotly_render import build_plotly_figure_from_db
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -32,7 +34,14 @@ def add_rel(body: schemas.RelCreate, db: Session = Depends(get_db)):
 # ✅ NEW: Plotly figure JSON
 @app.get("/api/plotly")
 def get_plotly(db: Session = Depends(get_db)):
-    return graph.build_plotly_graph_json(db)
+    return graph.build_plotly_figure_json(db)
+
+"""
+@app.get("/api/plotly")
+def plotly(db: Session = Depends(get_db)):
+    fig = build_plotly_figure_from_db(db)
+    return JSONResponse(fig.to_dict())
+"""
 
 @app.get("/health")
 def health():
