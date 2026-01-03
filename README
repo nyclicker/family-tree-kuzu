@@ -1,0 +1,48 @@
+# Code has UI, DB back end 
+UI is made out of html and java script files (index.html and app.js)
+DB is sqlalchemy and can be access via postgress (see below)
+** Warning : DB is not permanent so make sure to archive
+Tree uses Plotly to draw the graph
+
+### commit
+bash:
+git status
+git add -A
+git commit -m "comment"
+git push
+
+git tag -a v2.0 -m "Dockerized legacy renderer"
+git push --tags or  git push origin v2.0
+
+### SQL To run SQL using postgress do the following:
+
+bash
+docker compose exec db psql -U app -d familytree 
+
+make sure to put ";" at the end of the SQL in order to execute
+
+
+Quite: \q
+List tables: \dt
+Describe table: \d table_name
+Show connection info: \conninfo
+Toggle expanded output: \x
+Run a SQL script file: \i /path/to/file.sql
+
+## ARCHIVING
+to store the db onto a sql file
+bash
+docker compose exec db pg_dump -U app familytree > <family_tree.sql>
+
+to restore it:
+
+## to run stand alone load from txt to DB using the FastAPI importer module 
+bash
+docker compose run --rm api python -m app.importers.import_family_tree /app/data/gezaweldeamlak.txt
+
+## Todo
+Fix Zoom via scrolling
+Allow Person to be edited as a new menu option when node is selected
+Add functinoality to expert the graph to a file 
+Support for Spouse/Parent relationships
+Cleanup \n related data in names which was just a hack due to not having IDs.

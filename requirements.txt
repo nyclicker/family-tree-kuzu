@@ -1,3 +1,4 @@
 pandas>=2.0
 plotly>=5.18
 networkx>=3.0
+httpx>=0.25

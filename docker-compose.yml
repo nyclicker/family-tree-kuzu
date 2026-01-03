@@ -13,3 +13,6 @@ services:
       DATABASE_URL: postgresql+psycopg://app:app@db:5432/familytree
     ports: ["8080:8080"]
     depends_on: [db]
+    volumes:
+      - .:/app
+    working_dir: /app
