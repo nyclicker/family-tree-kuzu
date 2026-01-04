@@ -36,13 +36,6 @@ def add_rel(body: schemas.RelCreate, db: Session = Depends(get_db)):
 def get_plotly(db: Session = Depends(get_db)):
     return graph.build_plotly_figure_json(db)
 
-"""
-@app.get("/api/plotly")
-def plotly(db: Session = Depends(get_db)):
-    fig = build_plotly_figure_from_db(db)
-    return JSONResponse(fig.to_dict())
-"""
-
 @app.get("/health")
 def health():
     return {"ok": True}

@@ -69,6 +69,7 @@ def build_maps(rows: List[LegacyRow]):
 
     return children_map, parents_map, gender_map, display_name, hover_name, roots
 
+# Main Graph Builder Code
 def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], layer_gap: float = 4.0) -> go.Figure:
     children_map, parents_map, gender_map, display_name, hover_name, roots = build_maps_from_db(people, rels)
 
@@ -177,9 +178,50 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
     )
 
     fig = go.Figure(data=[edge_trace, node_trace])
-    # optional: make it easier to reference IDs on click in JS
-    fig.update_layout(clickmode="event+select")
+
+    # compute bounds from your node positions (pos: dict[node_id] -> (x,y))
+    xs = [xy[0] for xy in pos.values()]
+    ys = [xy[1] for xy in pos.values()]
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+    pad_x = 0.15 * (x_max - x_min if x_max > x_min else 1)
+    pad_y = 0.15 * (y_max - y_min if y_max > y_min else 1)
+
+    fig.update_layout(
+        # keep your click interaction
+        clickmode="event+select",
+
+        showlegend=False,
+        hovermode="closest",
+
+        # interaction defaults
+        dragmode="pan",          # drag pans; wheel zoom still works
+        # uirevision=True,        # optional: preserves zoom state across figure updates
+
+        autosize=True,
+        margin=dict(l=0, r=0, t=0, b=0),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[x_min - pad_x, x_max + pad_x],
+            scaleanchor="y",
+            scaleratio=1,
+            fixedrange=False,     # ensure zoom is allowed
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[y_min - pad_y, y_max + pad_y],
+            fixedrange=False,     # ensure zoom is allowed
+        ),
+    )
     return fig
+
 
 def build_maps_from_db(
     people: List[Person],

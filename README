@@ -12,7 +12,7 @@ git commit -m "comment"
 git push
 
 git tag -a v2.0 -m "Dockerized legacy renderer"
-git push --tags or  git push origin v2.0
+git git push origin v2.0
 
 ### SQL To run SQL using postgress do the following:
 
@@ -41,8 +41,9 @@ bash
 docker compose run --rm api python -m app.importers.import_family_tree /app/data/gezaweldeamlak.txt
 
 ## Todo
-Fix Zoom via scrolling
 Allow Person to be edited as a new menu option when node is selected
+Allow Delete of a node
+When a new node is added ensure to highlight that so it it is easier to see and can be linked to a parent
 Add functinoality to expert the graph to a file 
 Support for Spouse/Parent relationships
 Cleanup \n related data in names which was just a hack due to not having IDs.

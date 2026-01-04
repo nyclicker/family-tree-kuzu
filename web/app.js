@@ -116,7 +116,41 @@ async function drawGraph() {
   const fig = await res.json();
 
   const gd = document.getElementById("graph");
-  await Plotly.newPlot(gd, fig.data, fig.layout, fig.config || {});
+  //await Plotly.newPlot(gd, fig.data, fig.layout, fig.config || {});
+  //  await Plotly.react(gd, fig.data, fig.layout, config={"scrollZoom": "True", "responsive": "True", "displayModeBar": "True"} || {});
+
+  if (!gd) {
+    console.error("Missing #graph element");
+    return;
+  }
+
+  try {
+    console.log("Fetching /api/plotly ...");
+    const res = await fetch("/api/plotly");
+
+    console.log("Response status:", res.status);
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`GET /api/plotly failed: ${res.status} ${txt}`);
+    }
+
+    const fig = await res.json();
+    console.log("Got figure keys:", Object.keys(fig));
+
+    // Defensive defaults
+    fig.config = fig.config || {};
+    fig.config.scrollZoom = true;
+    fig.config.responsive = true;
+
+    await Plotly.react(gd, fig.data || [], fig.layout || {}, fig.config);
+    console.log("Plotly rendered.");
+  } catch (err) {
+    console.error("drawGraph error:", err);
+    // make it obvious on-screen too
+    gd.innerHTML = `<div style="padding:12px;color:#b00;font-family:system-ui">
+      Plot failed: ${String(err)}
+    </div>`;
+  }
 
   // Track last point Plotly says we clicked (reliable for nodes)
   let lastPoint = null;
@@ -198,6 +232,11 @@ async function drawGraph() {
     if (ev.key === "Escape") hideMenu();
   }, { once: true });
 }
+
+window.addEventListener("resize", () => {
+  const gd = document.getElementById("graph");
+  if (gd) Plotly.Plots.resize(gd);
+});
 
 let lastRightClickedPerson = null;
 
