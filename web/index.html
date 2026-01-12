@@ -80,6 +80,152 @@
       box-shadow: 0 6px 20px rgba(0,0,0,.25);
       max-width: 320px;
     }
+
+    /* Unified Tree + Relationship bar */
+    #treeBar {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 9999;
+      background: #111;
+      color: #fff;
+      padding: 12px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.25);
+      width: 300px;
+      font: 12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    #treeBar .section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #treeBar .title {
+      font-weight: 600;
+      opacity: .95;
+    }
+
+    #treeBar .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #treeBar select {
+      flex: 1;
+      background: #0b0b0b;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 8px;
+      outline: none;
+    }
+
+    #treeBar button {
+      background: transparent;
+      color: inherit;
+      border: 1px solid #333;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #treeBar button:hover {
+      background: rgba(255,255,255,.08);
+    }
+
+    #treeBar .sep {
+      height: 1px;
+      background: #2a2a2a;
+      margin: 10px 0;
+    }
+
+    #treeBar .rel-text {
+      opacity: .9;
+    }
+
+    #treeBar .rel-hint {
+      margin-top: 4px;
+      opacity: .65;
+    }
+
+    /* MODAL STYLES */
+    .modal-backdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 10000;
+    }
+
+    .modal{
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(420px, calc(100vw - 32px));
+      background: #111;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      padding: 14px;
+      z-index: 10001;
+    }
+
+    .modal-title{
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .modal-label{
+      display:block;
+      margin: 10px 0 6px;
+      opacity: .85;
+      font-size: 12px;
+    }
+
+    .modal-input, .modal-textarea{
+      width: 100%;
+      background: #0b0b0b;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 10px;
+      outline: none;
+      font: 14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    .modal-textarea{
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .modal-actions{
+      display:flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    .modal-btn{
+      background: transparent;
+      color: inherit;
+      border: 1px solid #333;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .modal-btn:hover{
+      background: rgba(255,255,255,.08);
+    }
+
+    .modal-btn.primary{
+      border-color: #555;
+    }
+        
   </style>
 </head>
 
@@ -88,21 +234,77 @@
   <!-- FULLSCREEN PLOTLY TARGET -->
   <div id="graph"></div>
 
+  <!-- TREE + STATUS BAR -->
+  <div id="treeBar">
+    <div class="section">
+      <div class="title">Family tree</div>
+
+      <div class="row">
+        <select id="treeSelect"></select>
+        <button id="treeNewBtn" title="Create new tree">＋</button>
+      </div>
+
+      <div class="row">
+        <input id="treeNameInput" class="modal-input" placeholder="Tree name" />
+      </div>
+
+      <div class="row">
+        <select id="treeVersionsSelect"></select>
+        <button id="treeLoadVersionBtn">Load</button>
+      </div>
+
+      <div class="row">
+        <button id="treeSaveBtn">Save</button>
+        <button id="treeDiscardBtn">Discard</button>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="section">
+      <div class="title">Relationship mode</div>
+
+      <div id="relStatusText" class="rel-text">
+        Right-click a person to begin.
+      </div>
+
+      <div class="rel-hint">
+        Tip: Press <b>Esc</b> to clear
+      </div>
+    </div>
+  </div>
+
   <!-- CONTEXT MENU -->
   <div id="ctxMenu">
     <div class="hint" id="ctxHint">Right-click menu</div>
+    <button id="ctxEditPerson">✏️ Edit Person…</button>
     <button id="ctxAddChildOf">🔗 Add CHILD_OF relationship…</button>
+    <button id="ctxDeletePerson">🗑️ Delete Person</button>
+    <button id="ctxDeleteRelationship">🗑️ Delete Relationship</button>
     <button id="ctxAddPerson">➕ Add Person…</button>
   </div>
 
-  <!-- STATUS OVERLAY -->
-  <div id="relStatus">
-    <div style="font-weight:600; margin-bottom:4px;">Relationship mode</div>
-    <div id="relStatusText" style="opacity:.9;">
-      Right-click a person to begin.
+  <!-- EDIT PERSON MODAL -->
+  <div id="personModalBackdrop" class="modal-backdrop" style="display:none;"></div>
+
+  <div id="personModal" class="modal" style="display:none;">
+    <div class="modal-title" id="personModalTitle">Edit Person</div>
+
+    <label class="modal-label">Name</label>
+    <input id="personNameInput" class="modal-input" placeholder="Full name" />
+
+    <label class="modal-label">Notes (optional)</label>
+    <textarea id="personNotesInput" class="modal-textarea" placeholder="Anything helpful…"></textarea>
+
+    <label class="modal-label">Change parent</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="personParentSelect" class="modal-input" style="flex:1"></select>
+      <button id="personParentSave" class="modal-btn">Set Parent</button>
     </div>
-    <div style="margin-top:6px; opacity:.65;">
-      Tip: Press <b>Esc</b> to clear.
+
+    <div class="modal-actions">
+      <button id="personModalCancel" class="modal-btn">Cancel</button>
+      <button id="personModalSave" class="modal-btn primary">Save</button>
     </div>
   </div>
 

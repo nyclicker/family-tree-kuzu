@@ -70,7 +70,7 @@ def build_maps(rows: List[LegacyRow]):
     return children_map, parents_map, gender_map, display_name, hover_name, roots
 
 # Main Graph Builder Code
-def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], layer_gap: float = 4.0) -> go.Figure:
+def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], published_ids: set | None = None, layer_gap: float = 4.0) -> go.Figure:
     children_map, parents_map, gender_map, display_name, hover_name, roots = build_maps_from_db(people, rels)
 
     if not roots:
@@ -80,7 +80,7 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
 
     # Debug if we're using IDs
     # sanity checks
-    print("DEBUG: Checking IDs...")
+    # DEBUG: Checking IDs... (removed)
     assert all(isinstance(k, str) for k in children_map.keys())
     for p, kids in children_map.items():
         for c in kids:
@@ -99,10 +99,43 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
     if dangling:
         print("DANGLING IDS:", dangling[:20])
 
-    print("DEBUG: ID checks passed.")
+    # DEBUG: ID checks passed. (removed)
+    """
+    # log published_ids for debugging draft detection
+    # DEBUG: published_ids logging removed
     # End Debug Code
-
+    """
     pos = radial_tree_layout_balanced_spaced(children_map, roots, layer_gap=layer_gap)
+
+    # Place draft-only nodes in a top-right stacked area. Prefer explicit
+    # published id set if provided; fall back to historic isdigit() heuristic.
+    linked_nodes = set()
+    for parent, kids in children_map.items():
+        linked_nodes.add(parent)
+        for c in kids:
+            linked_nodes.add(c)
+    for child in parents_map.keys():
+        linked_nodes.add(child)
+
+    def _is_draft_id(nid: str) -> bool:
+        if published_ids is not None:
+            return nid not in published_ids
+        return not nid.isdigit()
+
+    draft_nodes = [nid for nid in list(pos.keys()) if _is_draft_id(nid) and (nid not in linked_nodes)]
+    if draft_nodes:
+        xs_tmp = [xy[0] for xy in pos.values()]
+        ys_tmp = [xy[1] for xy in pos.values()]
+        x_min_tmp, x_max_tmp = min(xs_tmp), max(xs_tmp)
+        y_min_tmp, y_max_tmp = min(ys_tmp), max(ys_tmp)
+        pad_x_tmp = 0.15 * (x_max_tmp - x_min_tmp if x_max_tmp > x_min_tmp else 1)
+        pad_y_tmp = 0.15 * (y_max_tmp - y_min_tmp if y_max_tmp > y_min_tmp else 1)
+        stack_x = x_max_tmp + pad_x_tmp * 0.6
+        base_y = y_max_tmp
+        spacing = pad_y_tmp * 0.6
+        for i, nid in enumerate(sorted(draft_nodes)):
+            # stack downward from top-right
+            pos[nid] = (stack_x, base_y - i * spacing)
 
     # --- OPTIONAL: index relationships by (parent_id, child_id) so edges can carry rel IDs
     rel_id_by_pair = {}
@@ -142,11 +175,19 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
     )
 
     nodes = list(pos.keys())  # these are person_ids
-    node_colors = build_sibling_colors(nodes, children_map, parents_map, gender_map)
+    base_node_colors = build_sibling_colors(nodes, children_map, parents_map, gender_map)
 
     node_x, node_y, texts, hover_texts, node_customdata = [], [], [], [], []  # <-- NEW
+    node_colors_out: list = []
+    node_line_widths: list = []
+    node_line_colors: list = []
 
-    for person_id in nodes:
+    # Map the incoming people objects (merged objects) for quick lookup of
+    # an explicit `is_draft` flag which is set when merges introduce new
+    # draft-only persons.
+    people_obj_map = {str(getattr(p, 'id')): p for p in people}
+
+    for i, person_id in enumerate(nodes):
         x, y = pos[person_id]
         node_x.append(x)
         node_y.append(y)
@@ -158,11 +199,41 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
         hover_label = hover_name.get(person_id, short_label).replace("\n", "<br>")
         hover_texts.append(hover_label)
 
-        # <-- NEW: attach IDs (and anything else you want)
+        # Determine draft status. Prefer an explicit set of published IDs passed
+        # from the caller (build_plotly_figure_json). Fall back to the historic
+        # heuristic (numeric DB ids) for older setups.
+        # Prefer the authoritative published_ids (from DB) when available;
+        # only fall back to the merged object's is_draft flag or the historic
+        # heuristic if published_ids is not conclusive.
+        p_obj = people_obj_map.get(person_id)
+        if published_ids is not None and person_id in published_ids:
+            is_draft = False
+        elif p_obj is not None and getattr(p_obj, 'is_draft', False):
+            is_draft = True
+        else:
+            if published_ids is not None:
+                is_draft = person_id not in published_ids
+            else:
+                is_draft = not person_id.isdigit()
+
+        # attach IDs and draft flag
         node_customdata.append({
             "person_id": person_id,
             "label": display_name.get(person_id, None),
+            "is_draft": is_draft,
+            "published_count": (len(published_ids) if published_ids is not None else None),
         })
+
+        # style: override color/outline for draft nodes
+        base_color = base_node_colors[i] if i < len(base_node_colors) else "lightgray"
+        if is_draft:
+            node_colors_out.append("#ff7f0e")
+            node_line_widths.append(2)
+            node_line_colors.append("#000")
+        else:
+            node_colors_out.append(base_color)
+            node_line_widths.append(1)
+            node_line_colors.append("#333")
 
     node_trace = go.Scatter(
         x=node_x,
@@ -173,7 +244,7 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
         hoverinfo="text",
         hovertext=hover_texts,            # what user sees on hover
         customdata=node_customdata,       # <-- NEW: your true IDs live here
-        marker=dict(size=18, color=node_colors, line=dict(width=1, color="#333")),
+        marker=dict(size=18, color=node_colors_out, line=dict(width=node_line_widths, color=node_line_colors)),
         textfont=dict(size=9),
     )
 

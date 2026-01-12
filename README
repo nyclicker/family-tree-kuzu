@@ -12,7 +12,7 @@ git commit -m "comment"
 git push
 
 git tag -a v2.0 -m "Dockerized legacy renderer"
-git git push origin v2.0
+git push origin v2.0
 
 ### SQL To run SQL using postgress do the following:
 
@@ -29,7 +29,10 @@ Show connection info: \conninfo
 Toggle expanded output: \x
 Run a SQL script file: \i /path/to/file.sql
 
-## ARCHIVING
+## Purging disk space
+docker system prune # Be carefull as this deletes all data so you will need to ensure you have backup
+
+## ARCHIVING DB
 to store the db onto a sql file
 bash
 docker compose exec db pg_dump -U app familytree > <family_tree.sql>
@@ -40,6 +43,12 @@ to restore it:
 bash
 docker compose run --rm api python -m app.importers.import_family_tree /app/data/gezaweldeamlak.txt
 
+## To run tests
+# unit tests
+
+# end to end tests
+npm run test:e2e
+
 ## Todo
 Allow Person to be edited as a new menu option when node is selected
 Allow Delete of a node
@@ -47,3 +56,4 @@ When a new node is added ensure to highlight that so it it is easier to see and 
 Add functinoality to expert the graph to a file 
 Support for Spouse/Parent relationships
 Cleanup \n related data in names which was just a hack due to not having IDs.
+Support for multiple family trees and users.  this will need some design work and full screen is certainly not going t owork 

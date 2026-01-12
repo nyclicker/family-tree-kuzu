@@ -1,0 +1,575 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic:
+      - generic:
+        - img:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic: Weldeamlak\n(Geza)
+                      - generic:
+                        - generic: Berhane
+                      - generic:
+                        - generic: Misiel
+                      - generic:
+                        - generic: Aynalem
+                      - generic:
+                        - generic: Fisha
+                      - generic:
+                        - generic: Weldehans
+                      - generic:
+                        - generic: Gebremeskel WA
+                      - generic:
+                        - generic: Zeru TB
+                      - generic:
+                        - generic: Tesfagiorghis
+                      - generic:
+                        - generic: Gebremeskel TG
+                      - generic:
+                        - generic: Teklemichael
+                      - generic:
+                        - generic: Yohanna
+                      - generic:
+                        - generic: Abel TM
+                      - generic:
+                        - generic: Genet GM
+                      - generic:
+                        - generic: Solomon GM
+                      - generic:
+                        - generic: Damaris
+                      - generic:
+                        - generic: Delina
+                      - generic:
+                        - generic: Jeremiah
+                      - generic:
+                        - generic: Felegh
+                      - generic:
+                        - generic: Selam S
+                      - generic:
+                        - generic: Hadas GM
+                      - generic:
+                        - generic: Asmerom
+                      - generic:
+                        - generic: Rahwa
+                      - generic:
+                        - generic: Haben\n(Hadas)
+                      - generic:
+                        - generic: Eyob
+                      - generic:
+                        - generic: Teweldemedhin
+                      - generic:
+                        - generic: Negeset
+                      - generic:
+                        - generic: Tsigheweini
+                      - generic:
+                        - generic: Gebremedhin
+                      - generic:
+                        - generic: Andemeskel
+                      - generic:
+                        - generic: Gebretinsae
+                      - generic:
+                        - generic: Beyn
+                      - generic:
+                        - generic: Berhe
+                      - generic:
+                        - generic: Letensae
+                      - generic:
+                        - generic: Rebecca\n(Letensae)
+                      - generic:
+                        - generic: Zeru B
+                      - generic:
+                        - generic: Habtom B
+                      - generic:
+                        - generic: Kidane B
+                      - generic:
+                        - generic: Yodit B
+                      - generic:
+                        - generic: Biruk
+                      - generic:
+                        - generic: Bisrat
+                      - generic:
+                        - generic: John
+                      - generic:
+                        - generic: Zaid B
+                      - generic:
+                        - generic: Hailemariam
+                      - generic:
+                        - generic: EmunaTsion
+                      - generic:
+                        - generic: Mebrat B
+                      - generic:
+                        - generic: Tesfaghebriel
+                      - generic:
+                        - generic: Abrahatsion B
+                      - generic:
+                        - generic: Kifle
+                      - generic:
+                        - generic: Ablelom
+                      - generic:
+                        - generic: Teweldeberhan
+                      - generic:
+                        - generic: Habte
+                      - generic:
+                        - generic: Abraham
+                      - generic:
+                        - generic: Ogbaldet I
+                      - generic:
+                        - generic: Ogbazghi
+                      - generic:
+                        - generic: Tesfagabir I
+                      - generic:
+                        - generic: Naizgi
+                      - generic:
+                        - generic: Mehari
+                      - generic:
+                        - generic: Nigisti Naizgi
+                      - generic:
+                        - generic: Tekle GM
+                      - generic:
+                        - generic: Embaye Tekle
+                      - generic:
+                        - generic: Araya T
+                      - generic:
+                        - generic: Gebreselassie
+                      - generic:
+                        - generic: Kidane Tekle
+                      - generic:
+                        - generic: Weldegiorghis
+                      - generic:
+                        - generic: Weldeamlak\n(Bashay)
+                      - generic:
+                        - generic: Leterfiel WA
+                      - generic:
+                        - generic: Gebrehiwet
+                      - generic:
+                        - generic: Keshi Mehari
+                      - generic:
+                        - generic: Rigbe
+                      - generic:
+                        - generic: Werku
+                      - generic:
+                        - generic: Daniel GH
+                      - generic:
+                        - generic: Mengisteab
+                      - generic:
+                        - generic: Genet GH
+                      - generic:
+                        - generic: Iyasu
+                      - generic:
+                        - generic: Yemane Iyasu
+                      - generic:
+                        - generic: Senait Iyasu
+                      - generic:
+                        - generic: Gerezgiher
+                      - generic:
+                        - generic: Zerie
+                      - generic:
+                        - generic: Bana
+                      - generic:
+                        - generic: Awet G
+                      - generic:
+                        - generic: Tsigereda
+                      - generic:
+                        - generic: Yonas\n(Tsigereda)
+                      - generic:
+                        - generic: Lemlem\n(Tsigereda)
+                      - generic:
+                        - generic: Himan\n(Tsigereda)
+                      - generic:
+                        - generic: Winta
+                      - generic:
+                        - generic: Tirhas
+                      - generic:
+                        - generic: Robel\n(Tirhas)
+                      - generic:
+                        - generic: Saba\n(Tirhas)
+                      - generic:
+                        - generic: Helen\n(Tirhas)
+                      - generic:
+                        - generic: Senait\n(Tirhas)
+                      - generic:
+                        - generic: Mebrahutu
+                      - generic:
+                        - generic: Semhar\n(Tsigereda)
+                      - generic:
+                        - generic: Selam\n(Tsigereda)
+                      - generic:
+                        - generic: Kidusan
+                      - generic:
+                        - generic: Fesahaye
+                      - generic:
+                        - generic: Ablelom II
+                      - generic:
+                        - generic: Fisihatsion
+                      - generic:
+                        - generic: Abeba F
+                      - generic:
+                        - generic: Gerezgiher II
+                      - generic:
+                        - generic: Beraki
+                      - generic:
+                        - generic: Ethiopia
+                      - generic:
+                        - generic: Saba F
+                      - generic:
+                        - generic: Isayas
+                      - generic:
+                        - generic: Maaza
+                      - generic:
+                        - generic: Daniel F
+                      - generic:
+                        - generic: Liya
+                      - generic:
+                        - generic: Berhane II
+                      - generic:
+                        - generic: Mussie F
+                      - generic:
+                        - generic: Debretsion
+                      - generic:
+                        - generic: Teklehaimanot
+                      - generic:
+                        - generic: Senait TH
+                      - generic:
+                        - generic: Thomas
+                      - generic:
+                        - generic: Selam TH
+                      - generic:
+                        - generic: Yonas TH
+                      - generic:
+                        - generic: Bethlehem
+                      - generic:
+                        - generic: Letenegus
+                      - generic:
+                        - generic: Senait\n(Letenegus)
+                      - generic:
+                        - generic: Lemlem\n(Letenegus)
+                      - generic:
+                        - generic: Helen\n(Letenegus)
+                      - generic:
+                        - generic: Michael\n(Letenegus)
+                      - generic:
+                        - generic: Measho
+                      - generic:
+                        - generic: Yodit\n(Letenegus)
+                      - generic:
+                        - generic: Himan
+                      - generic:
+                        - generic: Weini
+                      - generic:
+                        - generic: Letekidan
+                      - generic:
+                        - generic: Teberh
+                      - generic:
+                        - generic: Senait\n(Weini)
+                      - generic:
+                        - generic: Haileab
+                      - generic:
+                        - generic: Ariam
+                      - generic:
+                        - generic: Genet D
+                      - generic:
+                        - generic: Zemuy
+                      - generic:
+                        - generic: Gebreyesus
+                      - generic:
+                        - generic: Kidisti
+                      - generic:
+                        - generic: Zeratsion
+                      - generic:
+                        - generic: Hannah
+                      - generic:
+                        - generic: Hansu WA
+                      - generic:
+                        - generic: Abrahaley
+                      - generic:
+                        - generic: Daniel Abrahaley
+                      - generic:
+                        - generic: Elnathan\n(Daniel)
+                      - generic:
+                        - generic: Sinnit
+                      - generic:
+                        - generic: Simon Daniel
+                      - generic:
+                        - generic: Shalom
+                      - generic:
+                        - generic: Martha
+                      - generic:
+                        - generic: Sara Abrahaley
+                      - generic:
+                        - generic: Bana\n(Sara)
+                      - generic:
+                        - generic: Rahsi
+                      - generic:
+                        - generic: Bisrat Abrahaley
+                      - generic:
+                        - generic: Finan
+                      - generic:
+                        - generic: Elsa
+                      - generic:
+                        - generic: Tesfalem
+                      - generic:
+                        - generic: Yohannes\n(Elsa)
+                      - generic:
+                        - generic: Azieb\n(Elsa)
+                      - generic:
+                        - generic: Gidey\n(Elsa)
+                      - generic:
+                        - generic: Tesfamariam\n(Elsa)
+                      - generic:
+                        - generic: Michael\n(Elsa)
+                      - generic:
+                        - generic: Bereket\n(Elsa)
+                      - generic:
+                        - generic: Yohanna\n(Elsa)
+                      - generic:
+                        - generic: Ogbatsion
+                      - generic:
+                        - generic: Biniam O
+                      - generic:
+                        - generic: Yohannes\n(Biniam)
+                      - generic:
+                        - generic: Efrem
+                      - generic:
+                        - generic: Nebiat WA
+                      - generic:
+                        - generic: Tuccu
+                      - generic:
+                        - generic: Aklilu
+                      - generic:
+                        - generic: Lulia
+                      - generic:
+                        - generic: Natalia
+                      - generic:
+                        - generic: Solomon T
+                      - generic:
+                        - generic: Sophie
+                      - generic:
+                        - generic: Simona
+                      - generic:
+                        - generic: Selamawit T
+                      - generic:
+                        - generic: Elnathan
+                      - generic:
+                        - generic: Sesina
+                      - generic:
+                        - generic: Teklu
+                      - generic:
+                        - generic: Almaz T
+                      - generic:
+                        - generic: Aster
+                      - generic:
+                        - generic: Liya II
+                      - generic:
+                        - generic: Ambasajer
+                      - generic:
+                        - generic: Sirak
+                      - generic:
+                        - generic: Semhar T
+                      - generic:
+                        - generic: Saba\nTeklu
+                      - generic:
+                        - generic: Zenawi
+                      - generic:
+                        - generic: Ruta\nTeklu
+                      - generic:
+                        - generic: Rahel\nTeklu
+                      - generic:
+                        - generic: Sebene
+                      - generic:
+                        - generic: Tesfamariam
+                      - generic:
+                        - generic: Desta
+                      - generic:
+                        - generic: Kahsai (Desta)
+                      - generic:
+                        - generic: Embaye Kahsai
+                      - generic:
+                        - generic: Weini Kahsai
+                      - generic:
+                        - generic: Haddas
+                      - generic:
+                        - generic: Hayle
+                      - generic:
+                        - generic: Tadelesh
+                      - generic:
+                        - generic: Tesfay K
+                      - generic:
+                        - generic: Alazar K
+                      - generic:
+                        - generic: Kudusan K
+                      - generic:
+                        - generic: Letebrhan
+                      - generic:
+                        - generic: Mahlet\n(Letebrhan)
+                      - generic:
+                        - generic: Ghideay\n(Letebrhan)
+                      - generic:
+                        - generic: Kudusan (Desta)
+                      - generic:
+                        - generic: Ghebremichael\n(Kudusan)
+                      - generic:
+                        - generic: Letenegus\n(Kudusan)
+                      - generic:
+                        - generic: Kidisti (Desta)
+                      - generic:
+                        - generic: Ghirmay\n(Kidisti)
+                      - generic:
+                        - generic: Roma\n(Kidisti)
+                      - generic:
+                        - generic: Tekie\n(Kidisti)
+                      - generic:
+                        - generic: Bereket\n(Kidisti)
+                      - generic:
+                        - generic: Kidane\n(Kidisti)
+                      - generic:
+                        - generic: Brhane\n(Kidisti)
+                      - generic:
+                        - generic: Fuzum\n(Kidisti)
+                      - generic:
+                        - generic: Ghile
+                      - generic:
+                        - generic: Tesfamariam G
+                      - generic:
+                        - generic: Hanibal
+                      - generic:
+                        - generic: Meron
+                      - generic:
+                        - generic: Kidan
+                      - generic:
+                        - generic: Eden\n(Kidan)
+                      - generic:
+                        - generic: Henok\n(Kidan)
+                      - generic:
+                        - generic: Betiel\n(Kidan)
+                      - generic:
+                        - generic: Hermon\n(Kidan)
+                      - generic:
+                        - generic: Habtom
+                      - generic:
+                        - generic: Tesfagabr
+                      - generic:
+                        - generic: Jonathan\n(Tesfagabr)
+                      - generic:
+                        - generic: Sarah\n(Tesfagabr)
+                      - generic:
+                        - generic: Joseph\n(Tesfagabr)
+                      - generic:
+                        - generic: Tesfaldet
+                      - generic:
+                        - generic: Habtom\n(Tesfaldet)
+                      - generic:
+                        - generic: Feven\n(Tesfaldet)
+                      - generic:
+                        - generic: Robel\n(Tesfaldet)
+                      - generic:
+                        - generic: Adam\n(Tesfaldet)
+                      - generic:
+                        - generic: Almaz G
+                      - generic:
+                        - generic: Amanuel\n(Almaz)
+                      - generic:
+                        - generic: Bana\n(Almaz)
+                      - generic:
+                        - generic: Dina\n(Almaz)
+                      - generic:
+                        - generic: Abel\n(Almaz)
+                      - generic:
+                        - generic: Yeol\n(Almaz)
+                      - generic:
+                        - generic: Yonas\n(Almaz)
+                      - generic:
+                        - generic: Gebriel
+                      - generic:
+                        - generic: Tsegay
+                      - generic:
+                        - generic: Nigisti Gebriel
+                      - generic:
+                        - generic: Gebrenegus
+                      - generic:
+                        - generic: Tesfazgi
+                      - generic:
+                        - generic: Semere
+                      - generic:
+                        - generic: Haile WG
+                      - generic:
+                        - generic: Siyum
+                      - generic:
+                        - generic: Semere II
+                      - generic:
+                        - generic: Keshi Gebreab
+                      - generic:
+                        - generic: Tekle Haile
+                      - generic:
+                        - generic: Gebreyesus WG
+                      - generic:
+                        - generic: Dehab GY
+                      - generic:
+                        - generic: Roma\n(Dehab)
+                      - generic:
+                        - generic: Asghedet
+                      - generic:
+                        - generic: Tsahaitu\n(Dehab)
+                      - generic:
+                        - generic: Semaetu
+                      - generic:
+                        - generic: Keshi Dagnew
+                      - generic:
+                        - generic: Gebremichael
+                      - generic:
+                        - generic: Mesfin GM
+                      - generic:
+                        - generic: Afewerki
+                      - generic:
+                        - generic: Tsedal
+                      - generic:
+                        - generic: Abrehet GM
+        - img
+        - generic [ref=e16]:
+          - img [ref=e19] [cursor=pointer]
+          - generic [ref=e21]:
+            - img [ref=e23] [cursor=pointer]
+            - img [ref=e26] [cursor=pointer]
+            - img [ref=e29] [cursor=pointer]
+            - img [ref=e32] [cursor=pointer]
+          - generic [ref=e34]:
+            - img [ref=e36] [cursor=pointer]
+            - img [ref=e39] [cursor=pointer]
+            - img [ref=e42] [cursor=pointer]
+            - img [ref=e45] [cursor=pointer]
+          - link "plotly-logomark" [ref=e48] [cursor=pointer]:
+            - /url: https://plotly.com/
+            - img "plotly-logomark" [ref=e49]
+        - img:
+          - generic:
+            - generic:
+              - generic: Debretsion
+  - generic [ref=e62]:
+    - generic [ref=e63]:
+      - generic [ref=e64]: Family tree
+      - generic [ref=e65]:
+        - combobox [ref=e66]:
+          - option "Select a tree..."
+          - option "gezaweldeamlak (v:1)" [selected]
+        - generic [ref=e67]: "1"
+        - button "＋" [ref=e68] [cursor=pointer]
+      - textbox "Tree name" [ref=e70]: gezaweldeamlak
+      - generic [ref=e71]:
+        - combobox [ref=e72]:
+          - option "v:1 (active)" [selected]
+        - button "Load" [ref=e73] [cursor=pointer]
+      - generic [ref=e74]:
+        - button "Save" [ref=e75] [cursor=pointer]
+        - button "Discard" [ref=e76] [cursor=pointer]
+    - generic [ref=e78]:
+      - generic [ref=e79]: Relationship mode
+      - generic [ref=e80]: Right-click a person to begin.
+      - generic [ref=e81]: "Tip: Press Esc to clear"
+  - img [ref=e82]
+```
