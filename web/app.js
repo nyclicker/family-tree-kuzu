@@ -178,6 +178,8 @@ async function drawGraph() {
     // clear any UI subtree highlight state before re-render
     try { clearSubtreeHighlight(gd); } catch (e) {}
     await Plotly.react(gd, fig.data || [], fig.layout || {}, fig.config);
+    // keep hoverdata fresh for right-click hit testing
+    try { attachPlotlyHoverTracking(gd); } catch (e) { /* ignore */ }
     try { setupEdgeHitLayer(gd); } catch (e) { /* ignore */ }
     console.log("Plotly rendered.");
   } catch (err) {
@@ -201,8 +203,9 @@ async function drawGraph() {
     // determine which trace was clicked: edges are usually the "lines" trace
     const trace = gdData[p.curveNumber] || {};
 
-    // If an edge (line) was clicked, handle edge actions (highlight or delete)
-    if ((trace.mode || "").includes("lines")) {
+    // If this point belongs to an edge (relationship), handle as edge click regardless of trace mode
+    const cd = p.customdata;
+    if (cd && (cd.relationship_id || (cd.parent_id && cd.child_id))) {
       handleEdgeClick(p, gd);
       return;
     }
@@ -245,58 +248,10 @@ async function drawGraph() {
   });
 
   // Right-click: decide node vs background by attempting to "hit test" using event target
-  // Use addEventListener for more reliable binding (Plotly may replace internal elements)
-  // Use a capture-phase document contextmenu listener tied to this graph instance.
-  // This is more reliable than binding on Plotly's internal elements.
-  const graphContextHandler = (ev) => {
-    // make handler async-capable by wrapping an inner async fn
-    (async function (ev) {
-    const inGraph = ev.target && ev.target.closest && ev.target.closest('#graph');
-    if (!inGraph) return; // let other handlers run for other graph instances
-    try {
-      ev.preventDefault();
-      hideMenu();
+  // Use a global context menu handler that works for all graph renders
+  setupContextMenuHandler();
 
-      // If we're in parent-pick mode, let right-click on background cancel
-      if (parentPickMode) {
-        const hit = tryResolveNodeFromEvent(ev, gd);
-        if (!hit) {
-          clearParentPick();
-          dismissAllMenus();
-          clearSelectionHighlights(gd);
-          return;
-        }
-      }
-
-      // Check edges FIRST (more specific), then nodes, then background
-      const hitEdge = await tryResolveEdgeFromEvent(ev, gd);
-      if (hitEdge) {
-        lastRightClickedEdge = hitEdge; // { relationship_id, parent_id, child_id }
-        showEdgeMenu(ev.clientX, ev.clientY);
-        return;
-      }
-
-      // If we didn't hit an edge, check for nodes
-      const person = await tryResolveNodeFromEventAsync(ev, gd);
-      if (person) {
-        lastRightClickedPerson = person;
-        showNodeMenu(ev.clientX, ev.clientY);
-      } else {
-        // No edge or node hit -> dismiss any open context UI
-        dismissAllMenus();
-        clearSelectionHighlights(gd);
-        if (parentPickMode) clearParentPick();
-      }
-    } catch (err) {
-      console.error('graphContextHandler error', err);
-      hideMenu();
-    }
-    })(ev);
-  };
-  document.addEventListener('contextmenu', graphContextHandler, true);
-
-  // (graphContextHandler above now handles contextmenu events within the graph)
-
+  // Set up global UI event handlers (only once)
   if (!_globalMenuListenersBound) {
     document.addEventListener("click", dismissAllMenus);
     window.addEventListener("scroll", () => dismissAllMenus(), true);
@@ -313,17 +268,90 @@ window.addEventListener("resize", () => {
 let lastRightClickedPerson = null;
 let lastRightClickedEdge = null;
 let _globalMenuListenersBound = false;
+let _contextMenuHandlerBound = false;
+
+// Global context menu handler - set up once, works for all drawGraph() calls
+function setupContextMenuHandler() {
+  if (_contextMenuHandlerBound) return; // only set up once
+  _contextMenuHandlerBound = true;
+  
+  document.addEventListener('contextmenu', async (ev) => {
+    const inGraph = ev.target && ev.target.closest && ev.target.closest('#graph');
+    if (!inGraph) return; // let other handlers run
+    
+    ev.preventDefault();
+    const gd = document.getElementById("graph"); // get current graph instance
+    if (!gd) return;
+    
+    try {
+      // If we're in parent-pick mode, let right-click on background cancel
+      if (parentPickMode) {
+        const hit = tryResolveNodeFromEvent(ev, gd);
+        if (!hit) {
+          clearParentPick();
+          dismissAllMenus();
+          clearSelectionHighlights(gd);
+          return;
+        }
+      }
+
+      // Check edges FIRST (more specific), then nodes, then background
+      const hitEdge = await tryResolveEdgeFromEvent(ev, gd);
+      console.log('[contextmenu] hitEdge:', hitEdge);
+      if (hitEdge) {
+        lastRightClickedEdge = hitEdge;
+        showEdgeMenu(ev.clientX, ev.clientY);
+        return;
+      }
+
+      // If we didn't hit an edge, check for nodes
+      const person = await tryResolveNodeFromEventAsync(ev, gd);
+      console.log('[contextmenu] person:', person);
+      if (person) {
+        lastRightClickedPerson = person;
+        showNodeMenu(ev.clientX, ev.clientY);
+      } else {
+        // No edge or node hit -> show background menu
+        dismissAllMenus();
+        clearSelectionHighlights(gd);
+        if (parentPickMode) {
+          clearParentPick();
+        } else {
+          showBackgroundMenu(ev.clientX, ev.clientY);
+        }
+      }
+    } catch (err) {
+      console.error('contextmenu handler error', err);
+      hideMenu();
+    } finally {
+      // Clean up hover after we're done detecting
+      try { Plotly.Fx.unhover(gd); } catch (e) {}
+    }
+  }, true); // capture phase
+}
 
 function clearSelectionHighlights(gd) {
   clearSubtreeHighlight(gd);
+  // Also reset any edge highlights and clear clicked state
+  lastRightClickedEdge = null;
+  lastRightClickedPerson = null;
 }
 
 function globalEscapeHandler(ev) {
   if (ev.key !== "Escape") return;
+  
+  // Clear all UI state
   if (parentPickMode) clearParentPick();
   dismissAllMenus();
+  setStatus("");
+  
+  // Clear all graph highlights
   const gd = document.getElementById("graph");
-  clearSelectionHighlights(gd);
+  if (gd) {
+    clearSelectionHighlights(gd);
+    // Unhover any lingering tooltips
+    try { Plotly.Fx.unhover(gd); } catch (e) {}
+  }
 }
 
 function personFromPlotlyPoint(p) {
@@ -342,6 +370,14 @@ function personFromPlotlyPoint(p) {
  * - We can also use Plotly.Fx.hover to force-hover at cursor pixel
  */
 function tryResolveNodeFromEvent(e, gd) {
+  // Prefer latest hover point if available
+  if (lastHoverPoint && lastHoverPoint.customdata && lastHoverPoint.customdata.person_id) {
+    return {
+      id: String(lastHoverPoint.customdata.person_id),
+      label: String(lastHoverPoint.customdata.label || lastHoverPoint.text || ''),
+    };
+  }
+
   // 1) If Plotly has hoverdata, use it
   const hover = gd._hoverdata;
   if (hover && hover.length) {
@@ -437,9 +473,8 @@ async function tryResolveEdgeFromEvent(e, gd) {
     console.log('[tryResolveEdgeFromEvent] ✗ no edge customdata found');
   } catch (err) {
     console.log('[tryResolveEdgeFromEvent] hover error:', err.message);
-  } finally {
-    try { Plotly.Fx.unhover(gd); } catch (e) {}
   }
+  // NOTE: Do NOT unhover here - we need the hover data for node detection next
   
   return null;
 }
@@ -477,29 +512,30 @@ function setupEdgeHitLayer(gd) {
     const cd = cds[i];
     if (x0 == null || x1 == null || y0 == null || y1 == null) continue;
 
-    // two interior points make hover detection reliable across the whole line
-    const mx1 = x0 + (x1 - x0) * 0.33;
-    const my1 = y0 + (y1 - y0) * 0.33;
-    const mx2 = x0 + (x1 - x0) * 0.66;
-    const my2 = y0 + (y1 - y0) * 0.66;
-
-    hitX.push(x0, mx1, mx2, x1, null);
-    hitY.push(y0, my1, my2, y1, null);
-    hitCD.push(cd, cd, cd, cd, null);
-    hitText.push(
-      'Right-click to delete relationship',
-      'Right-click to delete relationship',
-      'Right-click to delete relationship',
-      'Right-click to delete relationship',
-      ''
-    );
+    // sample multiple interior points along the segment (exclude exact endpoints to avoid node hover dominance)
+    const samples = 12; // improved coverage across full length
+    const eps = 1 / (samples + 1);
+    for (let s = 1; s <= samples; s++) {
+      const t = eps * s; // ~0.07..0.93 for samples=12
+      const xi = x0 + (x1 - x0) * t;
+      const yi = y0 + (y1 - y0) * t;
+      hitX.push(xi);
+      hitY.push(yi);
+      hitCD.push(cd);
+      hitText.push('Right-click to delete relationship');
+    }
+    // separate segments
+    hitX.push(null);
+    hitY.push(null);
+    hitCD.push(null);
+    hitText.push('');
   }
 
   const hit = {
     x: hitX,
     y: hitY,
-    mode: 'lines',
-    line: { width: 24, color: 'rgba(0,0,0,0.01)', simplify: false },
+    mode: 'markers',
+    marker: { size: 10, color: '#000', opacity: 0.01 },
     hoverinfo: 'text',
     hovertext: hitText,
     hoverdistance: 64,
@@ -517,6 +553,64 @@ function setupEdgeHitLayer(gd) {
 function addEdgeMidpointMarkers(gd) {
   // No longer needed - hit-layer handles all edge detection
 }
+
+// Utility to compute how many edges are hover-detectable via the hit-layer.
+// Samples from the actual edge trace and tests hover detection across the hit-layer.
+// Returns { edges: totalRelationshipCount, hits: relationshipsDetectedViaHover }
+window.computeEdgeHitCoverage = function () {
+  const gd = document.getElementById('graph');
+  if (!gd || !gd.data) return { edges: 0, hits: 0 };
+  
+  // Find the main edge trace (first trace with mode that includes 'lines')
+  const edgeIdx = gd.data.findIndex((t) => (t.mode || '').includes('lines') && Array.isArray(t.customdata) && t.customdata.length);
+  if (edgeIdx < 0) return { edges: 0, hits: 0 };
+  
+  const edgeTrace = gd.data[edgeIdx];
+  const xs = edgeTrace.x || [];
+  const ys = edgeTrace.y || [];
+  const cds = edgeTrace.customdata || [];
+  
+  // Find the hit-layer trace (markers with "Right-click to delete relationship" hover text)
+  const hitIdx = gd.data.findIndex((t, idx) => idx !== edgeIdx && (t.mode || '').includes('markers') && Array.isArray(t.hovertext) && t.hovertext.some((h) => h && h.indexOf('Right-click to delete relationship') >= 0));
+  if (hitIdx < 0) return { edges: cds.length / 3, hits: 0 }; // edges detected, but no hit-layer
+  
+  const hitXs = gd.data[hitIdx].x || [];
+  const hitYs = gd.data[hitIdx].y || [];
+  const hitCds = gd.data[hitIdx].customdata || [];
+
+  // Collect unique relationships from the edge trace
+  const seenRels = new Set();
+  for (let i = 0; i < xs.length; i += 3) {
+    const cd = cds[i];
+    if (!cd) continue;
+    const rid = cd.relationship_id || (cd.parent_id && cd.child_id && `${cd.parent_id}::${cd.child_id}`);
+    if (rid) seenRels.add(rid);
+  }
+
+  // Test hover detection on a sample of hit-layer points
+  const hitRels = new Set();
+  for (let i = 0; i < hitXs.length; i++) {
+    const x = hitXs[i];
+    const y = hitYs[i];
+    const cd = hitCds[i];
+    if (x == null || y == null || !cd) continue;
+    const rid = cd.relationship_id || (cd.parent_id && cd.child_id && `${cd.parent_id}::${cd.child_id}`);
+    if (rid) {
+      try {
+        Plotly.Fx.hover(gd, [{ x, y }], ['xy']);
+        const hv = gd._hoverdata && gd._hoverdata[0];
+        if (hv && hv.customdata) {
+          const hvRid = hv.customdata.relationship_id || (hv.customdata.parent_id && hv.customdata.child_id && `${hv.customdata.parent_id}::${hv.customdata.child_id}`);
+          if (hvRid) hitRels.add(hvRid);
+        }
+      } catch (_) {
+        // ignore and continue
+      }
+    }
+  }
+
+  return { edges: seenRels.size, hits: hitRels.size };
+};
 
 function buildEdgeList(gd) {
   const data = gd.data || [];

@@ -41,7 +41,7 @@ to restore it:
 
 ## to run stand alone load from txt to DB using the FastAPI importer module 
 bash
-docker compose run --rm api python -m app.importers.import_family_tree /app/data/gezaweldeamlak.txt
+docker compose exec api python3 -m app.importers.import_family_tree /app/data/gezaweldeamlak.txt
 
 ## To run tests
 # unit tests

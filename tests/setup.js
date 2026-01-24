@@ -15,7 +15,14 @@ global.Plotly = {
 };
 
 // Mock fetch
-global.fetch = jest.fn();
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve([]),
+    text: () => Promise.resolve(''),
+  })
+);
 
 // Mock DOM elements
 document.getElementById = jest.fn((id) => {
@@ -25,36 +32,34 @@ document.getElementById = jest.fn((id) => {
       data: [],
       _hoverdata: null,
       on: jest.fn(),
+      addEventListener: jest.fn(),
     },
-    ctxMenu: { style: { display: 'none', left: '0px', top: '0px' } },
-    ctxEditPerson: { style: { display: 'none' } },
-    ctxAddPerson: { style: { display: 'none' } },
-    ctxAddChildOf: { style: { display: 'none' } },
-    ctxDeletePerson: { style: { display: 'none' } },
-    ctxDeleteRelationship: { style: { display: 'none' } },
-    relStatusText: { textContent: '' },
-    draftCountBadge: { textContent: '0' },
-    treeSelect: { innerHTML: '', appendChild: jest.fn(), parentNode: { insertBefore: jest.fn() } },
-    personModal: { style: { display: 'none' }, dataset: {} },
-    personModalBackdrop: { style: { display: 'none' } },
-    personModalTitle: { textContent: '' },
-    personNameInput: { value: '' },
-    personNotesInput: { value: '' },
-    personParentSelect: { innerHTML: '', appendChild: jest.fn(), value: '' },
-    treeNameInput: { value: '' },
-    treeVersionsSelect: { innerHTML: '', appendChild: jest.fn(), value: '' },
-    treeLoadVersionBtn: { onclick: null },
-    treeSaveBtn: { onclick: null },
-    treeDiscardBtn: { onclick: null },
-    treeNewBtn: { onclick: null },
+    ctxMenu: { style: { display: 'none', left: '0px', top: '0px' }, addEventListener: jest.fn() },
+    ctxEditPerson: { style: { display: 'none' }, addEventListener: jest.fn(), onclick: null },
+    ctxAddPerson: { style: { display: 'none' }, addEventListener: jest.fn(), onclick: null },
+    ctxAddChildOf: { style: { display: 'none' }, addEventListener: jest.fn(), onclick: null },
+    ctxDeletePerson: { style: { display: 'none' }, addEventListener: jest.fn(), onclick: null },
+    ctxDeleteRelationship: { style: { display: 'none' }, addEventListener: jest.fn(), onclick: null },
+    relStatusText: { textContent: '', addEventListener: jest.fn() },
+    draftCountBadge: { textContent: '0', addEventListener: jest.fn() },
+    treeSelect: { innerHTML: '', appendChild: jest.fn(), parentNode: { insertBefore: jest.fn() }, addEventListener: jest.fn() },
+    personModal: { style: { display: 'none' }, dataset: {}, addEventListener: jest.fn() },
+    personModalBackdrop: { style: { display: 'none' }, addEventListener: jest.fn() },
+    personModalTitle: { textContent: '', addEventListener: jest.fn() },
+    personNameInput: { value: '', addEventListener: jest.fn() },
+    personNotesInput: { value: '', addEventListener: jest.fn() },
+    personParentSelect: { innerHTML: '', appendChild: jest.fn(), value: '', addEventListener: jest.fn() },
+    treeNameInput: { value: '', addEventListener: jest.fn() },
+    treeVersionsSelect: { innerHTML: '', appendChild: jest.fn(), value: '', addEventListener: jest.fn() },
+    treeLoadVersionBtn: { onclick: null, addEventListener: jest.fn() },
+    treeSaveBtn: { onclick: null, addEventListener: jest.fn() },
+    treeDiscardBtn: { onclick: null, addEventListener: jest.fn() },
+    treeNewBtn: { onclick: null, addEventListener: jest.fn() },
     personModalSave: { addEventListener: jest.fn() },
     personModalCancel: { addEventListener: jest.fn() },
     personParentSave: { addEventListener: jest.fn() },
-    ctxDeleteRelationship: { style: { display: 'none' }, addEventListener: jest.fn() },
-    ctxDeletePerson: { addEventListener: jest.fn() },
-    ctxEditPerson: { addEventListener: jest.fn() },
   };
-  return elements[id] || null;
+  return elements[id] || { style: {}, addEventListener: jest.fn(), onclick: null };
 });
 
 document.createElement = jest.fn((tag) => ({

@@ -109,6 +109,7 @@ def build_plotly_figure_from_db(
     # Build edge segments using DB IDs (no name-based linking)
     edge_x: list[float] = []
     edge_y: list[float] = []
+    edge_cd: list[dict] = []
 
     for r in rels:
         if r.type != RelType.CHILD_OF:
@@ -122,12 +123,22 @@ def build_plotly_figure_from_db(
         x1, y1 = pos[child_id]
         edge_x += [x0, x1, None]
         edge_y += [y0, y1, None]
+        edge_cd += [
+            {"relationship_id": r.id, "parent_id": parent_id, "child_id": child_id},
+            {"relationship_id": r.id, "parent_id": parent_id, "child_id": child_id},
+            None,
+        ]
 
     edge_trace = go.Scatter(
         x=edge_x,
         y=edge_y,
         mode="lines",
-        hoverinfo="skip",
+        hoverinfo="text",
+        hovertext=["Relationship" if cd else "" for cd in edge_cd],
+        hoverdistance=48,
+        line=dict(width=2, color="#555"),
+        showlegend=False,
+        customdata=edge_cd,
     )
 
     # Node scatter (again keyed by DB ids)
