@@ -1459,8 +1459,14 @@ async function loadTrees() {
         
         const res = await fetch('/import', { method: 'POST', body: formData });
         if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText);
+          let errorMsg = 'Unknown error';
+          try {
+            const errorData = await res.json();
+            errorMsg = errorData.error || errorData.details || errorMsg;
+          } catch {
+            errorMsg = await res.text();
+          }
+          throw new Error(errorMsg);
         }
         const data = await res.json();
         
@@ -1475,7 +1481,30 @@ async function loadTrees() {
         await populateVersions((await fetch(`/trees/${activeTreeId}/versions`).then(r => r.json())));
         await drawGraph();
         
-        setStatus(`✅ Imported: ${data.people_count} people, ${data.relationships_count} relationships`);
+        // Build status message with results
+        let statusMsg = `✅ Imported: ${data.people_count} people, ${data.relationships_count} relationships`;
+        
+        // Add warnings if any
+        if (data.warnings && data.warnings.length > 0) {
+          statusMsg += `\n⚠️ Warnings (${data.warnings.length}):`;
+          const warningsSample = data.warnings.slice(0, 5);
+          warningsSample.forEach(w => {
+            statusMsg += `\n  • ${w}`;
+          });
+          if (data.warnings.length > 5) {
+            statusMsg += `\n  ... and ${data.warnings.length - 5} more warnings`;
+          }
+        }
+        
+        // Add errors if any
+        if (data.errors && data.errors.length > 0) {
+          statusMsg += `\n❌ Errors (${data.errors.length}):`;
+          data.errors.forEach(e => {
+            statusMsg += `\n  • ${e}`;
+          });
+        }
+        
+        setStatus(statusMsg);
       } catch (err) {
         console.error('Import failed', err);
         setStatus(`❌ Import failed: ${String(err)}`);

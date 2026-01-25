@@ -74,15 +74,16 @@ def extract_people_for_import(data: Dict[str, Any]) -> Dict[str, Dict[str, str]]
 
 def extract_relationships_for_import(
     data: Dict[str, Any], name_to_id_map: Dict[str, str]
-) -> List[Tuple[int, Dict[str, str]]]:
+) -> Tuple[List[Tuple[int, Dict[str, str]]], List[str]]:
     """
     Convert JSON relationships array into the format expected by /relationships endpoint.
     Maps old person IDs to new IDs using name_to_id_map (person.display_name -> new person.id).
     Only processes CHILD_OF relationships. Other types are ignored for now.
     
-    Returns list of (line_no, rel_payload) tuples.
+    Returns tuple of (relationships, warnings).
     """
     relationships: List[Tuple[int, Dict[str, str]]] = []
+    warnings: List[str] = []
 
     for i, rel in enumerate(data.get("relationships", []), start=1):
         if not isinstance(rel, dict):
@@ -97,7 +98,7 @@ def extract_relationships_for_import(
         
         # Only process CHILD_OF relationships for now
         if rel_type != "CHILD_OF":
-            print(f"[IMPORT] Skipping relationship {i}: Type '{rel_type}' not yet supported")
+            warnings.append(f"Relationship {i}: Skipped type '{rel_type}' (not yet supported)")
             continue
 
         # Try to resolve IDs: check if they're in the name map (import by display_name)
@@ -118,4 +119,4 @@ def extract_relationships_for_import(
             )
         )
 
-    return relationships
+    return relationships, warnings

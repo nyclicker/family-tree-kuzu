@@ -29,6 +29,16 @@ def build_maps(rows: List[LegacyRow]):
         if not p1_id:
             continue
 
+        # Replace literal \n (backslash+n) with actual newline for proper display
+        if p1_disp:
+            p1_disp = p1_disp.replace('\\n', '\n')
+        if p2_disp:
+            p2_disp = p2_disp.replace('\\n', '\n')
+        if p1_hover:
+            p1_hover = p1_hover.replace('\\n', '\n')
+        if p2_hover:
+            p2_hover = p2_hover.replace('\\n', '\n')
+
         if p1_disp and p1_id not in display_name:
             display_name[p1_id] = p1_disp
         if p1_hover and p1_id not in hover_name:
@@ -314,8 +324,10 @@ def build_maps_from_db(
     # people maps
     for p in people:
         pid = str(p.id)
-        display_name[pid] = p.display_name or pid
-        hover_name[pid] = (p.display_name or pid)
+        # Replace literal \n (backslash+n) with actual newline for proper display
+        name = (p.display_name or pid).replace('\\n', '\n')
+        display_name[pid] = name
+        hover_name[pid] = name
         if getattr(p, "sex", None):
             gender_map[pid] = str(p.sex.value) if hasattr(p.sex, "value") else str(p.sex)
 

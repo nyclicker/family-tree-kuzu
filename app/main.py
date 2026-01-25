@@ -83,6 +83,8 @@ async def import_file(
         rel_reqs = []
         rows = None
         json_data = None
+        warnings = []
+        errors = []
         
         if is_json:
             json_data = parse_family_tree_json(tmp_path)
@@ -112,13 +114,17 @@ async def import_file(
                     counter += 1
                 base_name = f"{base_name}_{counter}"
             
-            # Create a new tree
-            tree, tv = crud.create_or_increment_tree_version(
-                db,
-                name=base_name,
-                source_filename=file.filename,
-                tree_id=None
-            )
+            # Always create a brand new tree (not a version)
+            tree = Tree(name=base_name, description=f"Imported from {file.filename}")
+            db.add(tree)
+            db.commit()
+            db.refresh(tree)
+            
+            # Create initial version
+            tv = TreeVersion(tree_id=tree.id, version=1, source_filename=file.filename, active=True)
+            db.add(tv)
+            db.commit()
+            db.refresh(tv)
         
         # Import people
         name_to_id: dict[str, str] = {}
@@ -141,6 +147,11 @@ async def import_file(
                 to_id = rel.get('to_person_id')
                 rel_type = rel.get('type', 'CHILD_OF')
                 
+                # Only process CHILD_OF
+                if rel_type != 'CHILD_OF':
+                    warnings.append(f"Skipped relationship: Type '{rel_type}' not yet supported")
+                    continue
+                
                 # Find person by ID in json people array
                 from_person = next((p for p in json_data.get('people', []) if p.get('id') == from_id), None)
                 if from_person:
@@ -159,18 +170,22 @@ async def import_file(
                         }))
         else:
             # For txt/csv
-            rel_reqs = build_relationship_requests(rows, name_to_id)
+            rel_reqs, txt_warnings = build_relationship_requests(rows, name_to_id)
+            warnings.extend(txt_warnings)
         
         # Import relationships
         for line_no, rel_payload in rel_reqs:
-            crud.create_relationship(
-                db,
-                from_id=rel_payload.get('from_person_id'),
-                to_id=rel_payload.get('to_person_id'),
-                rel_type=rel_payload.get('type'),
-                tree_id=tree.id,
-                tree_version_id=tv.id
-            )
+            try:
+                crud.create_relationship(
+                    db,
+                    from_id=rel_payload.get('from_person_id'),
+                    to_id=rel_payload.get('to_person_id'),
+                    rel_type=rel_payload.get('type'),
+                    tree_id=tree.id,
+                    tree_version_id=tv.id
+                )
+            except Exception as e:
+                errors.append(f"Line {line_no}: Failed to create relationship - {str(e)}")
         
         # Cleanup
         try:
@@ -184,10 +199,18 @@ async def import_file(
             "version": tv.version,
             "people_count": len(name_to_id),
             "relationships_count": len(rel_reqs),
+            "warnings": warnings,
+            "errors": errors,
         }
     
     except Exception as e:
-        raise ValueError(f"Import failed: {str(e)}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": f"Import failed: {str(e)}",
+                "details": str(e)
+            }
+        )
 
 
 @app.post("/trees/import", response_model=schemas.TreeImportOut)

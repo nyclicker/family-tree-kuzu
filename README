@@ -4,6 +4,14 @@ DB is sqlalchemy and can be access via postgress (see below)
 ** Warning : DB is not permanent so make sure to archive
 Tree uses Plotly to draw the graph
 
+### Database Connection Pool
+The app uses SQLAlchemy with connection pooling:
+- Pool size: 20 connections
+- Max overflow: 30 additional connections
+- Pool timeout: 60 seconds
+- Connection recycle: 1 hour
+This allows up to 50 concurrent database connections to handle multiple simultaneous requests.
+
 ### commit
 bash:
 git status

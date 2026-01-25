@@ -37,15 +37,25 @@ def radial_tree_layout_balanced_spaced(
     for n in all_nodes:
         local_children.setdefault(n, [])
 
-    # subtree sizes
+    # subtree sizes with cycle detection
     subtree_cache: Dict[str, int] = {}
+    visiting: set = set()
 
     def subtree_size(node: str) -> int:
         if node in subtree_cache:
             return subtree_cache[node]
+        
+        # Detect cycles
+        if node in visiting:
+            # Cycle detected, return 1 to prevent infinite recursion
+            return 1
+        
+        visiting.add(node)
         size = 1
         for c in local_children.get(node, []):
             size += subtree_size(c)
+        visiting.remove(node)
+        
         subtree_cache[node] = size
         return size
 
@@ -58,8 +68,19 @@ def radial_tree_layout_balanced_spaced(
         return depth * layer_gap * (1.0 + radial_scale * max(depth - 1, 0))
 
     pos: Dict[str, Tuple[float, float]] = {}
+    assign_visiting: set = set()
 
     def assign(node: str, depth: int, a0: float, a1: float):
+        # Prevent infinite recursion from cycles
+        if node in assign_visiting:
+            return
+        
+        # Limit depth to prevent issues
+        if depth > 50:
+            return
+            
+        assign_visiting.add(node)
+        
         amid = 0.5 * (a0 + a1)
         r = effective_radius(depth)
 
@@ -68,11 +89,13 @@ def radial_tree_layout_balanced_spaced(
 
         kids = local_children.get(node, [])
         if not kids:
+            assign_visiting.remove(node)
             return
 
         sizes = [subtree_cache[k] for k in kids]
         total = sum(sizes)
         if total <= 0:
+            assign_visiting.remove(node)
             return
 
         n = len(kids)
@@ -88,6 +111,8 @@ def radial_tree_layout_balanced_spaced(
             kspan = usable * share
             assign(kid, depth + 1, cur, cur + kspan)
             cur = cur + kspan + eff_pad
+        
+        assign_visiting.remove(node)
 
     assign(root_for_layout, 0, 0.0, 2.0 * math.pi)
     return pos

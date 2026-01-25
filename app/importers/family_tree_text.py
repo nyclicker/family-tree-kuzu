@@ -107,13 +107,17 @@ def build_people_set(rows: List[ParsedRow]) -> Dict[str, Dict[str, str]]:
 def build_relationship_requests(
     rows: List[ParsedRow],
     name_to_id: Dict[str, str],
-) -> List[Tuple[int, Dict[str, str]]]:
+) -> Tuple[List[Tuple[int, Dict[str, str]]], List[str]]:
     """
-    Returns list of (line_no, rel_payload).
+    Returns tuple of (relationships, warnings).
+    relationships: list of (line_no, rel_payload)
+    warnings: list of warning messages for skipped items
+    
     Enforces: Person2 must exist in name_to_id if referenced.
     Only processes CHILD_OF relationships. Other types are ignored for now.
     """
     rels: List[Tuple[int, Dict[str, str]]] = []
+    warnings: List[str] = []
 
     for r in rows:
         if r.relation in SKIP_RELATIONS:
@@ -121,26 +125,27 @@ def build_relationship_requests(
 
         if r.relation not in REL_MAP:
             # Skip unknown relations instead of raising error
-            print(f"[IMPORT] Skipping line {r.line_no}: Unknown relation '{r.relation}' (will support in future)")
+            warnings.append(f"Line {r.line_no}: Skipped unknown relation '{r.relation}' (will support in future)")
             continue
         
         # Only process CHILD_OF relationships for now
         rel_type = REL_MAP[r.relation]
         if rel_type != "CHILD_OF":
-            print(f"[IMPORT] Skipping line {r.line_no}: Relation type '{rel_type}' not yet supported")
+            warnings.append(f"Line {r.line_no}: Skipped relation type '{rel_type}' (not yet supported)")
             continue
 
         # must reference an existing person2 (as per your rule)
         if r.person2:
             if r.person2 not in name_to_id:
-                raise ValueError(
-                    f"Line {r.line_no}: Person 2 {r.person2!r} not found among Person 1 set. "
-                    f"Fix the file (Person 2 must exist as a Person 1 somewhere)."
+                warnings.append(
+                    f"Line {r.line_no}: Person 2 '{r.person2}' not found (must exist as Person 1 somewhere)"
                 )
+                continue
             to_id = name_to_id[r.person2]
         else:
-            # if no person2 provided, that’s not a valid relationship in your schema
-            raise ValueError(f"Line {r.line_no}: Person 2 is required for relation {r.relation!r}")
+            # if no person2 provided, that's not a valid relationship in your schema
+            warnings.append(f"Line {r.line_no}: Person 2 is required for relation '{r.relation}'")
+            continue
 
         from_id = name_to_id[r.person1]
 
@@ -155,4 +160,4 @@ def build_relationship_requests(
             )
         )
 
-    return rels
+    return rels, warnings
