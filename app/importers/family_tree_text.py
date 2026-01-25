@@ -111,7 +111,7 @@ def build_relationship_requests(
     """
     Returns list of (line_no, rel_payload).
     Enforces: Person2 must exist in name_to_id if referenced.
-    Skips Earliest Ancestor relationships.
+    Only processes CHILD_OF relationships. Other types are ignored for now.
     """
     rels: List[Tuple[int, Dict[str, str]]] = []
 
@@ -120,7 +120,15 @@ def build_relationship_requests(
             continue
 
         if r.relation not in REL_MAP:
-            raise ValueError(f"Line {r.line_no}: Unknown relation {r.relation!r}")
+            # Skip unknown relations instead of raising error
+            print(f"[IMPORT] Skipping line {r.line_no}: Unknown relation '{r.relation}' (will support in future)")
+            continue
+        
+        # Only process CHILD_OF relationships for now
+        rel_type = REL_MAP[r.relation]
+        if rel_type != "CHILD_OF":
+            print(f"[IMPORT] Skipping line {r.line_no}: Relation type '{rel_type}' not yet supported")
+            continue
 
         # must reference an existing person2 (as per your rule)
         if r.person2:

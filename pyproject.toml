@@ -16,7 +16,8 @@ dependencies = [
   "pandas",
   "networkx",
   "plotly>=5.18",
-  "httpx>=0.25"
+  "httpx>=0.25",
+  "python-multipart>=0.0.6"
 ]
 
 [project.optional-dependencies]

@@ -1,10 +1,17 @@
-from fastapi import FastAPI, Depends, Query, Body
+import json
+import tempfile
+import glob
+from datetime import datetime
+from pathlib import Path
+from fastapi import FastAPI, Depends, Query, Body, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from .db import get_db, engine
 from .models import Base, Tree, TreeVersion
 from . import crud, schemas, graph
+from .importers.family_tree_text import parse_family_tree_txt, build_people_set, build_relationship_requests
+from .importers.family_tree_json import parse_family_tree_json, extract_people_for_import, extract_relationships_for_import
 #from .plotly_graph.db_plotly import build_plotly_figure_from_db
 #from .plotly_graph.plotly_render import build_plotly_figure_from_db
 
@@ -37,6 +44,150 @@ def add_person(body: schemas.PersonCreate, db: Session = Depends(get_db)):
 @app.post("/relationships")
 def add_rel(body: schemas.RelCreate, db: Session = Depends(get_db)):
     return crud.create_relationship(db, body.from_person_id, body.to_person_id, body.type, tree_id=body.tree_id, tree_version_id=body.tree_version_id)
+
+
+@app.post("/import")
+async def import_file(
+    file: UploadFile = File(...),
+    tree_name: str | None = Query(None),
+    tree_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Import a family tree file (txt, csv, or json).
+    If tree_id is provided, creates a new version of that tree.
+    Otherwise, creates a new tree with a unique name.
+    """
+    if not file.filename:
+        raise ValueError("File is required")
+    
+    # Determine file type
+    file_ext = Path(file.filename).suffix.lower()
+    is_json = file_ext == ".json"
+    is_text = file_ext in (".txt", ".csv")
+    
+    if not is_json and not is_text:
+        raise ValueError(f"Unsupported file format: {file_ext}. Use .txt, .csv, or .json")
+    
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Save to temp file for parsing
+        with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        
+        # Parse based on format
+        people_payloads = {}
+        rel_reqs = []
+        rows = None
+        json_data = None
+        
+        if is_json:
+            json_data = parse_family_tree_json(tmp_path)
+            people_payloads = extract_people_for_import(json_data)
+        else:  # txt or csv
+            rows = parse_family_tree_txt(tmp_path)
+            people_payloads = build_people_set(rows)
+        
+        # If tree_id is provided, add as new version to existing tree
+        if tree_id is not None:
+            tree, tv = crud.create_or_increment_tree_version(
+                db,
+                name=None,  # Keep existing tree name
+                source_filename=file.filename,
+                tree_id=tree_id
+            )
+        else:
+            # Determine tree name (use provided name or filename)
+            base_name = tree_name if tree_name else Path(file.filename).stem
+            
+            # Ensure unique tree name by checking for duplicates
+            existing_tree = db.query(Tree).filter(Tree.name == base_name).first()
+            if existing_tree:
+                # Find next available name with suffix
+                counter = 2
+                while db.query(Tree).filter(Tree.name == f"{base_name}_{counter}").first():
+                    counter += 1
+                base_name = f"{base_name}_{counter}"
+            
+            # Create a new tree
+            tree, tv = crud.create_or_increment_tree_version(
+                db,
+                name=base_name,
+                source_filename=file.filename,
+                tree_id=None
+            )
+        
+        # Import people
+        name_to_id: dict[str, str] = {}
+        for name, payload in people_payloads.items():
+            p = crud.create_person(
+                db,
+                display_name=payload.get('display_name', ''),
+                sex=payload.get('sex', 'U'),
+                notes=payload.get('notes'),
+                tree_id=tree.id,
+                tree_version_id=tv.id
+            )
+            name_to_id[name] = str(p.id)
+        
+        # Build relationships based on format
+        if is_json and json_data:
+            # For JSON, map IDs using display_name lookup
+            for rel in json_data.get('relationships', []):
+                from_id = rel.get('from_person_id')
+                to_id = rel.get('to_person_id')
+                rel_type = rel.get('type', 'CHILD_OF')
+                
+                # Find person by ID in json people array
+                from_person = next((p for p in json_data.get('people', []) if p.get('id') == from_id), None)
+                if from_person:
+                    resolved_from = name_to_id.get(from_person.get('display_name'))
+                    if resolved_from:
+                        resolved_to = None
+                        if to_id:
+                            to_person = next((p for p in json_data.get('people', []) if p.get('id') == to_id), None)
+                            if to_person:
+                                resolved_to = name_to_id.get(to_person.get('display_name'))
+                        
+                        rel_reqs.append((1, {
+                            'from_person_id': resolved_from,
+                            'to_person_id': resolved_to,
+                            'type': rel_type,
+                        }))
+        else:
+            # For txt/csv
+            rel_reqs = build_relationship_requests(rows, name_to_id)
+        
+        # Import relationships
+        for line_no, rel_payload in rel_reqs:
+            crud.create_relationship(
+                db,
+                from_id=rel_payload.get('from_person_id'),
+                to_id=rel_payload.get('to_person_id'),
+                rel_type=rel_payload.get('type'),
+                tree_id=tree.id,
+                tree_version_id=tv.id
+            )
+        
+        # Cleanup
+        try:
+            Path(tmp_path).unlink()
+        except Exception:
+            pass
+        
+        return {
+            "tree_id": tree.id,
+            "tree_version_id": tv.id,
+            "version": tv.version,
+            "people_count": len(name_to_id),
+            "relationships_count": len(rel_reqs),
+        }
+    
+    except Exception as e:
+        raise ValueError(f"Import failed: {str(e)}")
 
 
 @app.post("/trees/import", response_model=schemas.TreeImportOut)
@@ -125,4 +276,146 @@ def get_plotly(
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/export", include_in_schema=True)
+def export_data(
+    tree_id: int | None = Query(None, description="Optional tree id to export"),
+    tree_version_id: int | None = Query(None, description="Optional tree version id to export"),
+    save_to_disk: bool = Query(False, description="Save to data/exports/ instead of downloading"),
+    prefer_non_empty: bool = Query(True, description="If active version is empty, fallback to latest non-empty version"),
+    filename: str | None = Query(None, description="Custom filename (without .json extension)"),
+    db: Session = Depends(get_db),
+):
+    """Export people and relationships as a JSON file.
+    
+    By default, returns file for download. Set save_to_disk=true to save to data/exports/ folder.
+    Keeps last 5 versions per tree when saving to disk.
+    """
+    payload = crud.export_data(db, tree_id=tree_id, tree_version_id=tree_version_id)
+
+    # If exporting by tree_id and no explicit tree_version_id, optionally
+    # fallback to the latest non-empty version when the active is empty.
+    if (
+        prefer_non_empty
+        and tree_id is not None
+        and tree_version_id is None
+        and payload
+        and len(payload.get("people", [])) == 0
+        and len(payload.get("relationships", [])) == 0
+    ):
+        versions = (
+            db.query(TreeVersion)
+            .filter(TreeVersion.tree_id == tree_id)
+            .order_by(TreeVersion.version.desc())
+            .all()
+        )
+        for v in versions:
+            candidate = crud.export_data(db, tree_id=tree_id, tree_version_id=v.id)
+            if len(candidate.get("people", [])) > 0 or len(candidate.get("relationships", [])) > 0:
+                payload = candidate
+                break
+
+    if save_to_disk:
+        # Save to data/exports/ directory
+        exports_dir = Path("data/exports")
+        exports_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename if not provided
+        if filename:
+            file_path = exports_dir / f"{filename}.json"
+            prefix_for_cleanup = None  # Don't cleanup custom filenames
+        else:
+            # Use tree name and version from export payload
+            tree_info = payload.get("tree")
+            version_info = payload.get("tree_version")
+            
+            if tree_info and version_info:
+                # Sanitize tree name for filename (replace spaces and special chars)
+                safe_name = tree_info["name"].replace(" ", "_").replace("/", "_").replace("\\", "_")
+                
+                # Check if a file already exists for this tree version
+                existing_pattern = str(exports_dir / f"{safe_name}_v{version_info['version']}_*.json")
+                existing_files = glob.glob(existing_pattern)
+                
+                if existing_files:
+                    # Overwrite the existing file for this version (use the first one)
+                    file_path = Path(existing_files[0])
+                else:
+                    # New version, create with timestamp
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    file_path = exports_dir / f"{safe_name}_v{version_info['version']}_{timestamp}.json"
+                
+                prefix_for_cleanup = safe_name  # Use tree name prefix for cleanup
+            elif tree_info:
+                safe_name = tree_info["name"].replace(" ", "_").replace("/", "_").replace("\\", "_")
+                
+                # Check if a file already exists for this tree (without version)
+                existing_pattern = str(exports_dir / f"{safe_name}_*.json")
+                existing_files = [f for f in glob.glob(existing_pattern) if "_v" not in f]
+                
+                if existing_files:
+                    file_path = Path(existing_files[0])
+                else:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    file_path = exports_dir / f"{safe_name}_{timestamp}.json"
+                
+                prefix_for_cleanup = safe_name
+            else:
+                # No tree info - check if generic export exists
+                existing_pattern = str(exports_dir / "family_tree_export_*.json")
+                existing_files = glob.glob(existing_pattern)
+                
+                if existing_files:
+                    file_path = Path(existing_files[0])
+                else:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    file_path = exports_dir / f"family_tree_export_{timestamp}.json"
+                
+                prefix_for_cleanup = "family_tree_export"
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        
+        # Cleanup old versions: keep only the 5 most recent exports for this tree
+        if prefix_for_cleanup:
+            cleanup_old_exports(exports_dir, prefix_for_cleanup)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": f"Export saved to {str(file_path)}",
+            "path": str(file_path)
+        })
+    else:
+        # Return file for download
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
+        with open(tmp.name, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        
+        # Generate download filename with tree name if available
+        tree_info = payload.get("tree")
+        version_info = payload.get("tree_version")
+        download_filename = "family_tree_export.json"
+        if tree_info and version_info:
+            safe_name = tree_info["name"].replace(" ", "_").replace("/", "_").replace("\\", "_")
+            download_filename = f"{safe_name}_v{version_info['version']}.json"
+        elif tree_info:
+            safe_name = tree_info["name"].replace(" ", "_").replace("/", "_").replace("\\", "_")
+            download_filename = f"{safe_name}.json"
+        
+        return FileResponse(tmp.name, media_type="application/json", filename=download_filename)
+
+
+def cleanup_old_exports(exports_dir: Path, prefix: str, keep_count: int = 5):
+    """Keep only the most recent `keep_count` exports matching the prefix pattern."""
+    # Find all export files matching the prefix (e.g., "gezaweldeamlak_v*.json")
+    pattern = str(exports_dir / f"{prefix}_v*.json")
+    matching_files = sorted(glob.glob(pattern), key=lambda p: Path(p).stat().st_mtime, reverse=True)
+    
+    # Delete files beyond the keep_count most recent
+    for old_file in matching_files[keep_count:]:
+        try:
+            Path(old_file).unlink()
+        except Exception:
+            pass  # Ignore errors if file can't be deleted
 

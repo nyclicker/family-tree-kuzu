@@ -43,6 +43,50 @@ to restore it:
 bash
 docker compose exec api python3 -m app.importers.import_family_tree /app/data/gezaweldeamlak.txt
 
+## Export data (people + relationships) to JSON
+
+### Download to current directory:
+```bash
+curl -o family_tree_export.json "http://localhost:8080/export"
+```
+
+### Download with tree name and version in filename:
+```bash
+curl -o gezaweldeamlak_v2.json "http://localhost:8080/export?tree_id=1"
+```
+
+### Save to data/exports/ with timestamp (first export of a version):
+```bash
+curl "http://localhost:8080/export?tree_id=1&save_to_disk=true"
+# First export of v1: gezaweldeamlak_v1_20260125_004309.json
+# Subsequent exports of v1: overwrites same file (no new timestamp)
+# When v2 created: gezaweldeamlak_v2_20260125_004325.json
+```
+
+### Save to data/exports/ with custom filename (never auto-deleted):
+```bash
+curl "http://localhost:8080/export?tree_id=1&save_to_disk=true&filename=important_backup"
+# Result: important_backup.json
+# Persists indefinitely, not subject to version cleanup
+```
+
+### Prefer non-empty version automatically (recommended)
+If the active version has no records (e.g., created during testing), the export will
+fall back to the latest non-empty version by default.
+
+```bash
+# Fallback behavior is on by default
+curl "http://localhost:8080/export?tree_id=1"
+
+# To require the active version even if empty:
+curl "http://localhost:8080/export?tree_id=1&prefer_non_empty=false"
+
+# Explicitly export a known populated version
+curl "http://localhost:8080/export?tree_id=1&tree_version_id=1"
+```
+
+**Version History**: Automatically keeps the last 5 exported versions per tree. Older versions are deleted when you create new ones.
+
 ## To run tests
 # unit tests
 

@@ -136,6 +136,48 @@
       background: rgba(255,255,255,.08);
     }
 
+    #treeBar .import-zone {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #treeBar .import-drop-area {
+      border: 2px dashed #444;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      background: rgba(255,255,255,.02);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #treeBar .import-drop-area:hover {
+      border-color: #666;
+      background: rgba(255,255,255,.05);
+    }
+
+    #treeBar .import-drop-area.drag-over {
+      border-color: #4a9eff;
+      background: rgba(74,158,255,.1);
+    }
+
+    #treeBar .import-icon {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    #treeBar .import-text {
+      font-size: 12px;
+      opacity: .9;
+    }
+
+    #treeBar .import-hint {
+      font-size: 11px;
+      opacity: .6;
+      margin-top: 4px;
+    }
+
     #treeBar .sep {
       height: 1px;
       background: #2a2a2a;
@@ -256,6 +298,15 @@
       <div class="row">
         <button id="treeSaveBtn">Save</button>
         <button id="treeDiscardBtn">Discard</button>
+      </div>
+
+      <div class="import-zone">
+        <input id="fileImportInput" type="file" accept=".txt,.csv,.json" style="display:none;" />
+        <div id="importDropArea" class="import-drop-area" title="Click to browse or drag & drop a file">
+          <div class="import-icon">📁</div>
+          <div class="import-text">Click or drag file to import</div>
+          <div class="import-hint">Supports: .txt, .csv, .json</div>
+        </div>
       </div>
     </div>
 

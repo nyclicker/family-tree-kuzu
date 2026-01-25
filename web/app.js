@@ -1150,6 +1150,37 @@ async function publishDrafts() {
   setStatus("Published drafts as new version.");
 }
 
+// Trigger an export for the current tree.
+// By default, initiates a file download; if saveToDisk=true, saves on server and reports path.
+async function exportCurrentTree({ saveToDisk = false, filename = null } = {}) {
+  if (!activeTreeId) {
+    setStatus('Select a tree before exporting.');
+    return;
+  }
+  try {
+    const baseUrl = `/export?tree_id=${encodeURIComponent(activeTreeId)}`;
+    const url = baseUrl + (saveToDisk ? `&save_to_disk=true` : '') + (filename ? `&filename=${encodeURIComponent(filename)}` : '');
+    if (saveToDisk) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setStatus(`Export saved: ${data.path || 'done'}`);
+    } else {
+      // Initiate a download by programmatically clicking a hidden link
+      const a = document.createElement('a');
+      a.href = url;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setStatus('Export started (download).');
+    }
+  } catch (err) {
+    console.error('Export failed', err);
+    setStatus('Export failed: ' + String(err));
+  }
+}
+
 async function loadTrees() {
   try {
     const res = await fetch('/trees');
@@ -1290,6 +1321,11 @@ async function loadTrees() {
           }
           if (!confirm('Publish drafts as a new version?')) return;
           await publishDrafts();
+          // After publishing, export the current tree both ways:
+          // 1) Save to disk on the server
+          await exportCurrentTree({ saveToDisk: true });
+          // 2) Trigger a browser download for the user
+          await exportCurrentTree({ saveToDisk: false });
         } catch (err) {
           setStatus('Publish failed: ' + String(err));
         }
@@ -1310,6 +1346,140 @@ async function loadTrees() {
           setStatus('Discard failed: ' + String(err));
         }
       };
+    }
+
+    // Import file handler with drag-and-drop support
+    const fileInput = document.getElementById('fileImportInput');
+    const importDropArea = document.getElementById('importDropArea');
+    
+    if (importDropArea && fileInput) {
+      // Click to browse
+      importDropArea.onclick = () => fileInput.click();
+      
+      // Drag and drop handlers
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        importDropArea.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+      });
+      
+      ['dragenter', 'dragover'].forEach(eventName => {
+        importDropArea.addEventListener(eventName, () => {
+          importDropArea.classList.add('drag-over');
+        });
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        importDropArea.addEventListener(eventName, () => {
+          importDropArea.classList.remove('drag-over');
+        });
+      });
+      
+      importDropArea.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          handleFileImport(files[0]);
+        }
+      });
+      
+      // File input change
+      fileInput.onchange = async (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          await handleFileImport(file);
+          fileInput.value = ''; // Reset
+        }
+      };
+    }
+    
+    // Handle file import
+    async function handleFileImport(file) {
+      // Validate file type
+      const validExtensions = ['.txt', '.csv', '.json'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validExtensions.includes(fileExt)) {
+        setStatus(`❌ Invalid file type. Please use .txt, .csv, or .json files.`);
+        return;
+      }
+      
+      try {
+        // Extract base name from filename (without extension)
+        const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+        
+        // Check if tree name already exists
+        const existingTree = treesCache.find(t => t.name === baseName);
+        let treeName = baseName;
+        let targetTreeId = null;
+        
+        if (existingTree) {
+          // Show options using confirm dialogs
+          const addAsVersion = confirm(
+            `A tree named "${baseName}" already exists.\n\n` +
+            `Click OK to add this as a NEW VERSION to the existing tree.\n` +
+            `Click Cancel to create a NEW TREE with a different name.`
+          );
+          
+          if (addAsVersion) {
+            // Add as new version to existing tree
+            targetTreeId = existingTree.id;
+            treeName = existingTree.name;
+            setStatus(`⏳ Importing ${file.name} as new version of "${treeName}"...`);
+          } else {
+            // Prompt for new tree name
+            const newName = prompt(
+              `Enter a name for the new tree:`,
+              baseName
+            );
+            
+            if (!newName) {
+              setStatus('Import cancelled.');
+              return;
+            }
+            
+            treeName = newName.trim();
+            if (!treeName) {
+              setStatus('❌ Tree name cannot be empty.');
+              return;
+            }
+            setStatus(`⏳ Importing ${file.name} as new tree "${treeName}"...`);
+          }
+        } else {
+          setStatus(`⏳ Importing ${file.name} as "${treeName}"...`);
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        if (targetTreeId !== null) {
+          formData.append('tree_id', targetTreeId);
+        } else {
+          formData.append('tree_name', treeName);
+        }
+        
+        const res = await fetch('/import', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText);
+        }
+        const data = await res.json();
+        
+        activeTreeId = data.tree_id;
+        activeTreeVersionId = data.tree_version_id;
+        
+        // Reload everything
+        await loadTrees();
+        await refreshPeopleDropdowns();
+        await refreshDraftsCount();
+        await refreshTreeName();
+        await populateVersions((await fetch(`/trees/${activeTreeId}/versions`).then(r => r.json())));
+        await drawGraph();
+        
+        setStatus(`✅ Imported: ${data.people_count} people, ${data.relationships_count} relationships`);
+      } catch (err) {
+        console.error('Import failed', err);
+        setStatus(`❌ Import failed: ${String(err)}`);
+      }
     }
 
     // Create new tree button -> prompt for name and call import endpoint (creates tree + initial version)

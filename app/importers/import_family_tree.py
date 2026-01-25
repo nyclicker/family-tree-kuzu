@@ -11,19 +11,35 @@ from app.importers.family_tree_text import (
     build_people_set,
     build_relationship_requests,
 )
+from app.importers.family_tree_json import (
+    parse_family_tree_json,
+    extract_people_for_import,
+    extract_relationships_for_import,
+)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("txt_path", help="Path to family tree .txt file inside container")
+    parser.add_argument("file_path", help="Path to family tree file (.txt or .json) inside container")
     parser.add_argument("--tree-id", type=int, default=None, help="Optional tree id to import into")
     args = parser.parse_args()
 
-    file_path = Path(args.txt_path)
+    file_path = Path(args.file_path)
     if not file_path.exists():
         raise SystemExit(f"File not found: {file_path}")
 
-    rows = parse_family_tree_txt(file_path)
-    people_payloads = build_people_set(rows)
+    # Detect file type: .json vs .txt/.csv (both treated as text-based CSV format)
+    is_json = file_path.suffix.lower() == ".json"
+    is_text_format = file_path.suffix.lower() in (".txt", ".csv")
+    
+    if is_json:
+        json_data = parse_family_tree_json(file_path)
+        people_payloads = extract_people_for_import(json_data)
+        rel_reqs = extract_relationships_for_import(json_data, {})  # name_to_id map built below
+    elif is_text_format:
+        rows = parse_family_tree_txt(file_path)
+        people_payloads = build_people_set(rows)
+    else:
+        raise SystemExit(f"Unsupported file format: {file_path.suffix}. Use .txt, .csv, or .json")
 
     client = TestClient(app)
 
@@ -43,7 +59,7 @@ def main() -> None:
         tree_id = data["tree_id"]
         tree_version_id = data["tree_version_id"]
 
-    # Create people (Person 1 only)
+    # Create people
     name_to_id: dict[str, str] = {}
     for name, payload in people_payloads.items():
         send_payload = dict(payload)
@@ -55,8 +71,13 @@ def main() -> None:
             raise SystemExit(f"/people failed for {name!r}: {resp.status_code} {resp.text}")
         name_to_id[name] = resp.json()["id"]
 
-    # Create relationships (validates Person2 exists in Person1 set)
-    rel_reqs = build_relationship_requests(rows, name_to_id)
+    # Create relationships
+    if is_json:
+        # rel_reqs already populated from extract_relationships_for_import above
+        pass
+    elif is_text_format:
+        rel_reqs = build_relationship_requests(rows, name_to_id)
+    
     for line_no, rel_payload in rel_reqs:
         send_rel = dict(rel_payload)
         send_rel["tree_id"] = tree_id

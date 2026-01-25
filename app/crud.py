@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from .models import Person, Relationship, Sex, RelType, Tree, TreeVersion
 from .models import WorkingChange
 from uuid import uuid4
+from typing import Any, Dict, List
 
 
 def create_person(db: Session, display_name: str, sex: str, notes: str | None, tree_id: int | None = None, tree_version_id: int | None = None):
@@ -84,6 +85,91 @@ def delete_drafts_for_base(db: Session, tree_id: int, base_tree_version_id: int)
     q.delete(synchronize_session=False)
     db.commit()
     return count
+
+
+def export_data(db: Session, tree_id: int | None = None, tree_version_id: int | None = None) -> Dict[str, Any]:
+    """Export people and relationships for a tree or tree version."""
+    effective_tree_id = tree_id
+    effective_tree_version_id = tree_version_id
+
+    # Resolve active tree version when only tree_id is provided
+    if effective_tree_version_id is None and effective_tree_id is not None:
+        tv = (
+            db.query(TreeVersion)
+            .filter(TreeVersion.tree_id == effective_tree_id, TreeVersion.active == True)
+            .order_by(TreeVersion.version.desc())
+            .first()
+        )
+        if tv:
+            effective_tree_version_id = tv.id
+
+    # Export people
+    q_people = db.query(Person)
+    if effective_tree_version_id is not None:
+        q_people = q_people.filter(Person.tree_version_id == effective_tree_version_id)
+    elif effective_tree_id is not None:
+        q_people = q_people.filter(Person.tree_id == effective_tree_id)
+    people_rows = q_people.order_by(Person.display_name.asc()).all()
+
+    people: List[Dict[str, Any]] = []
+    for p in people_rows:
+        people.append(
+            {
+                "id": str(p.id),
+                "display_name": p.display_name,
+                "sex": p.sex.value if hasattr(p.sex, "value") else str(p.sex),
+                "notes": p.notes,
+                "tree_id": p.tree_id,
+                "tree_version_id": p.tree_version_id,
+            }
+        )
+
+    # Export relationships
+    q_rel = db.query(Relationship)
+    if effective_tree_version_id is not None:
+        q_rel = q_rel.filter(Relationship.tree_version_id == effective_tree_version_id)
+    elif effective_tree_id is not None:
+        q_rel = q_rel.filter(Relationship.tree_id == effective_tree_id)
+    rel_rows = q_rel.all()
+
+    relationships: List[Dict[str, Any]] = []
+    for r in rel_rows:
+        relationships.append(
+            {
+                "id": str(r.id),
+                "from_person_id": str(r.from_person_id) if r.from_person_id is not None else None,
+                "to_person_id": str(r.to_person_id) if r.to_person_id is not None else None,
+                "type": r.type.value if hasattr(r.type, "value") else str(r.type),
+                "tree_id": r.tree_id,
+                "tree_version_id": r.tree_version_id,
+            }
+        )
+
+    # Include tree/tree_version metadata for context
+    tree_meta = None
+    if effective_tree_id is not None:
+        t = db.query(Tree).filter(Tree.id == effective_tree_id).first()
+        if t:
+            tree_meta = {"id": t.id, "name": t.name, "description": t.description}
+
+    version_meta = None
+    if effective_tree_version_id is not None:
+        tv = db.query(TreeVersion).filter(TreeVersion.id == effective_tree_version_id).first()
+        if tv:
+            version_meta = {
+                "id": tv.id,
+                "tree_id": tv.tree_id,
+                "version": tv.version,
+                "source_filename": tv.source_filename,
+                "active": bool(tv.active),
+            }
+
+    return {
+        "tree": tree_meta,
+        "tree_version": version_meta,
+        "people": people,
+        "relationships": relationships,
+    }
 
 
 def publish_drafts(db: Session, tree_id: int | None, base_tree_version_id: int | None) -> tuple[Tree, TreeVersion]:

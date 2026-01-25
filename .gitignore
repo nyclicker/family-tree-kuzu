@@ -26,3 +26,5 @@ playwright-report/
 *.jpg
 *.jpeg
 error-context.md
+# Export data
+data/exports/
