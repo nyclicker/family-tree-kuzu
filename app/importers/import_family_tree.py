@@ -10,6 +10,7 @@ from app.importers.family_tree_text import (
     parse_family_tree_txt,
     build_people_set,
     build_relationship_requests,
+    detect_duplicates,
 )
 from app.importers.family_tree_json import (
     parse_family_tree_json,
@@ -37,6 +38,15 @@ def main() -> None:
         rel_reqs = extract_relationships_for_import(json_data, {})  # name_to_id map built below
     elif is_text_format:
         rows = parse_family_tree_txt(file_path)
+        
+        # Detect and display duplicate warnings
+        duplicate_warnings = detect_duplicates(rows, file_path.name)
+        if duplicate_warnings:
+            print("\n⚠️  DUPLICATE WARNINGS:")
+            for warning in duplicate_warnings:
+                print(f"  - {warning}")
+            print()
+        
         people_payloads = build_people_set(rows)
     else:
         raise SystemExit(f"Unsupported file format: {file_path.suffix}. Use .txt, .csv, or .json")
@@ -76,7 +86,12 @@ def main() -> None:
         # rel_reqs already populated from extract_relationships_for_import above
         pass
     elif is_text_format:
-        rel_reqs = build_relationship_requests(rows, name_to_id)
+        rel_reqs, rel_warnings = build_relationship_requests(rows, name_to_id)
+        if rel_warnings:
+            print("\n⚠️  RELATIONSHIP WARNINGS:")
+            for warning in rel_warnings:
+                print(f"  - {warning}")
+            print()
     
     for line_no, rel_payload in rel_reqs:
         send_rel = dict(rel_payload)

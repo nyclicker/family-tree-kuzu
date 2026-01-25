@@ -1,0 +1,115 @@
+Person 1,Relation,Person 2,Gender,Details
+Chirum,Earliest Ancestor,,M,
+Zerhariat,Child,Chirum,M
+Bekhit,Child,Zerhariat,M
+Tekie,Child,Bekhit,M
+Rigbay,Spouse,Tekie,F
+Amleset,Child,Tekie,F
+Zufan,Child,Tekie,F
+Tesfamariam T,Child,Tekie,M
+Kidane T,Child,Tekie,M,Highlight
+Goitom,Child,Tekie,M
+Letensie,Child,Tekie,F
+Dehab Tekie,Child,Tekie,F
+Teka,Spouse,Kidane T,F,Highlight
+Habtemichael,Child,Dehab Tekie,M
+Silas,Child,Letensie,F
+Hiwet,Child,Letensie,F
+Maaza,Child,Letensie,F
+Afewerki,Child,Letensie,M
+Merathab,Child,Letensie,F
+Saba (Amleset),Child,Amleset,F
+Zeweldi,Child,Zufan,M
+Nigisti (Zufan),Child,Zufan,F
+<???>,Child,Zufan,F
+Luwam,Child,Goitom,F
+Muna,Child,Goitom,F
+Nahom,Child,Goitom,M
+Stefanos,Child,Tesfamariam T,M
+Yordanos,Child,Tesfamariam T,F
+Sara T,Child,Tesfamariam T,F
+Genet T,Child,Tesfamariam T,F
+Azieb,Child,Tesfamariam T,F
+Hilot,Child,Tesfamariam T,F
+Alazar,Child,Tesfamariam T,M
+Selam,Child,Tesfamariam T,F
+Eden,Child,Kidane T,F
+Helen,Child,Kidane T,F
+Zaid,Child,Kidane T,F
+Tesfay,Child,Kidane T,M
+Girmay K,Child,Kidane T,M
+Sara K,Child,Kidane T,F
+Efrem II,Child,Kidane T,M
+Araya,Parent,Teka,M
+Gebreyohannes,Parent,Araya,M
+Kudusan,Child,Gebreyohannes,F
+Tikabo,Child,Gebreyohannes,M
+Askalu,Child,Gebreyohannes,F
+Madelina,Child,Gebreyohannes,F
+Nigisti GY,Child,Gebreyohannes,F
+Teka,Child,Araya,F
+Afewerki2,Child,Araya,M
+Berhane A,Child,Araya,M
+Gebremeskel,Child,Araya,M
+Sara A,Child,Araya,F
+Tsigeweini A,Child,Araya,F
+Letebrhan,Child,Araya,F
+Girmay A,Child,Araya,M
+Russom,Child,Araya,M
+Tesfay,Child,Tikabo,M
+Tsigereda T,Child,Tikabo,F
+Hani,Child,Tikabo,F
+Solomon Tikabo,Child,Tikabo,M
+Mehari T,Child,Tikabo,M
+Saba T,Child,Tikabo,F
+Selam,Child,Tikabo,F
+Habtemichael2,Child,Nigisti GY,M
+Weldemichael,Child,Nigisti GY,M
+Roma (Nigisti),Child,Nigisti GY,F
+Aregash,Child,Nigisti GY,F
+Tsegai,Child,Tsigeweini A,M
+Hadas,Child,Tsigeweini A,F
+Abeba,Parent,Teka,F
+Gonche,Parent,Abeba,M
+Ntsihiti,Child,Gonche,F
+Tsirha,Child,Gonche,F
+Yihdega,Child,Gonche,F
+Andemariam G,Child,Gonche,M
+Robel,Child,Ntsihiti,M
+Hiwet,Child,Gonche,F
+Letensie2,Child,Tsirha,F
+Belaynesh,Child,Tsirha,F
+Tekie2,Child,Tsirha,M
+Beyene,Child,Tsirha,M
+Emuna,Child,Yihdega,F
+Yemane A,Child,Andemariam G,M
+Birikti,Child,Andemariam G,F
+Tewelde,Child,Andemariam G,M
+Miletu,Child,Andemariam G,F
+Tekle A,Child,Andemariam G,M
+Firweweini,Child,Berhane A,F
+Fitsum B,Child,Berhane A,M
+Amaniel B,Child,Berhane A,M
+Simon,Child,Berhane A,M
+Iyob B,Child,Berhane A,M
+Negassi,Child,Berhane A,M
+Daniel B,Child,Berhane A,M
+Michael B,Child,Berhane A,M
+Temesgen,Child,Berhane A,M
+Mussie B,Spouse,Eden,M
+Sidon,Child,Eden,F
+Simon,Child,Eden,M
+Yonas,Spouse,Helen,M
+Rodas,Child,Helen,F
+Daniel Y,Child,Helen,M
+Aklilu,Spouse,Zaid,M
+Lulia,Child,Zaid,F
+Natalia,Child,Zaid,F
+Kidisti,Spouse,Girmay K,F
+Heaven,Child,Girmay K,F
+Hermon,Child,Girmay K,M
+Muzit,Spouse,Tesfay,F
+Arsema,Child,Tesfay,F
+Elilta,Child,Tesfay,F
+Emnet,Child,Tesfay,M
+Simret K,Child,Kidane T,F

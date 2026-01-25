@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .db import get_db, engine
 from .models import Base, Tree, TreeVersion
 from . import crud, schemas, graph
-from .importers.family_tree_text import parse_family_tree_txt, build_people_set, build_relationship_requests
+from .importers.family_tree_text import parse_family_tree_txt, build_people_set, build_relationship_requests, detect_duplicates
 from .importers.family_tree_json import parse_family_tree_json, extract_people_for_import, extract_relationships_for_import
 #from .plotly_graph.db_plotly import build_plotly_figure_from_db
 #from .plotly_graph.plotly_render import build_plotly_figure_from_db
@@ -91,6 +91,12 @@ async def import_file(
             people_payloads = extract_people_for_import(json_data)
         else:  # txt or csv
             rows = parse_family_tree_txt(tmp_path)
+            
+            # Detect duplicates before processing
+            duplicate_warnings = detect_duplicates(rows, file.filename)
+            if duplicate_warnings:
+                warnings.extend(duplicate_warnings)
+            
             people_payloads = build_people_set(rows)
         
         # If tree_id is provided, add as new version to existing tree

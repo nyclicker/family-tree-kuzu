@@ -1,0 +1,178 @@
+Person 1,Relation,Person 2,Gender,Details
+Andemariam,Earliest Ancestor,,M,Blata Tekle
+Medhin,Child,Andemariam,F
+Tekle,Child,Andemariam,M,Highlight
+Gebrehiwet A,Child,Andemariam,M
+Negusse A,Child,Andemariam,M
+Leteyesus,Child,Andemariam,F
+Gerghis,Spouse,Tekle,F
+Abraha,Child,Negusse A,M
+Roma N,Child,Negusse A,F
+Nigisti I,Child,Negusse A,F
+Dagnew,Child,Negusse A,M
+Tsigeweini,Child,Negusse A,F
+Hansu,Child,Negusse A,F
+Tsehaitu,Child,Negusse A,F
+Mesfin I,Child,Negusse A,M
+Asefaw,Child,Negusse A,M
+Teka\n(Leteyesus),Child,Leteyesus,F
+Mikiele,Child,Leteyesus,M
+Hidega,Child,Medhin,F
+Genet,Child,Medhin,F
+Mebrat,Child,Medhin,F
+Freweini,Child,Medhin,F
+Asefash,Child,Gebrehiwet A,F
+Aregash GH,Child,Gebrehiwet A,F
+Tekie GH,Child,Gebrehiwet A,M
+Embaye,Child,Gebrehiwet A,F
+Roma,Child,Gebrehiwet A,F
+Kiros,Child,Gebrehiwet A,M
+Isaac,Child,Tekle,M
+Zewdi,Child,Tekle,F
+Dimka,Child,Tekle,F
+Sembetu,Child,Tekle,F
+Leterfiel,Child,Tekle,F
+Dehab,Child,Tekle,F
+Letezghi,Spouse,Isaac,F
+Nega,Child,Asefash,M
+Asmeret,Child,Asefash,F
+Yonas\n(Asefash),Child,Asefash,M
+Daniel\n(Asefash),Child,Asefash,M
+Efrem\n(Asefash),Child,Asefash,M
+Aida,Child,Asefash,F
+Tedros2,Child,Aregash GH,M
+Rut,Child,Aregash GH,F
+Asghedom,Child,Roma,M
+Emebet,Child,Roma,F
+Yodit\n(Roma),Child,Roma,F
+Serait,Child,Roma,F
+Rahwa\n(Nini),Child,Roma,F
+Skander,Child,Roma,M
+Alula,Child,Tekie GH,M
+Zena,Child,Tekie GH,F
+Fasil T,Child,Tekie GH,M
+Fiori\n(Fifi),Child,Embaye,F
+Alem Isaac,Child,Isaac,M
+Almaz,Child,Isaac,F
+Nigisti,Child,Isaac,F
+Kibrom,Child,Isaac,M
+Yohannes I,Child,Isaac,M
+Simret,Child,Isaac,F
+Mebrat Isaac,Child,Isaac,F
+Ghebrat,Spouse,Zewdi,M
+Dawit,Child,Zewdi,M
+Haile,Child,Zewdi,M
+Tedros,Child,Zewdi,M
+Yohannes Ghebrat,Child,Zewdi,M
+Iyob,Child,Zewdi,M
+Daniel G,Child,Zewdi,M
+Azieb G,Child,Zewdi,F
+Helen G,Child,Zewdi,F
+Kidane,Spouse,Dimka,M
+Senait K,Child,Dimka,F
+Efrem K,Child,Dimka,M
+Amanuel,Child,Dimka,M
+Eden\n(Dimka),Child,Dimka,M
+Fasil K,Child,Dimka,M
+Yonas K,Child,Dimka,M
+Mihret,Child,Dimka,F
+Fitsum,Child,Dimka,M
+Berhane K,Child,Dimka,M
+Mesfin,Spouse,Sembetu,M
+Biniam,Child,Sembetu,M
+Mussie,Child,Sembetu,M
+Yosief,Child,Sembetu,M
+Saba,Child,Sembetu,F
+Samuel M,Child,Sembetu,M
+Sara,Child,Sembetu,F
+Negusse,Spouse,Leterfiel,M
+Mekonen,Child,Leterfiel,M
+Bethlehem,Child,Leterfiel,F
+Yonas N,Child,Leterfiel,M
+Rahel,Child,Leterfiel,F
+Nebiat,Child,Leterfiel,F
+Lidya,Child,Leterfiel,F
+Tuccu,Spouse,Dehab,M
+Aklilu,Child,Dehab,M
+Solomon T,Child,Dehab,M
+Selamawit T,Child,Dehab,F
+Lulia,Child,Aklilu,F
+Natalia,Child,Aklilu,F
+Sophie,Child,Solomon T,F
+Simona,Child,Solomon T,F
+Elnathan,Child,Selamawit T,M
+Sesina,Child,Selamawit T,F
+London,Child,Lidya,M
+Adu\n(LJ),Child,Lidya,M
+Huruy,Child,Tedros,M
+Sinit,Child,Tedros,F
+Yonatan Yohannes,Child,Yohannes Ghebrat,M
+Bethlehem\nYoannes,Child,Yohannes Ghebrat,F
+Hanibal,Child,Yohannes Ghebrat,M
+Heyabel,Child,Yohannes Ghebrat,F
+Abigail D,Child,Daniel G,F
+Robel,Child,Azieb G,M
+Feven,Child,Azieb G,F
+Elizabeth,Child,Senait K,F
+Sarah,Child,Senait K,F
+Simon,Child,Senait K,M
+Lamek,Child,Efrem K,M
+Milen,Child,Efrem K,F
+Nathan E,Child,Efrem K,M
+Aron,Child,Biniam,M
+Susana,Child,Biniam,F
+Mikias,Child,Mussie,M
+Asenia,Child,Yosief,F
+Lilet,Child,Saba,F
+Yoel,Child,Saba,M
+Melissa,Child,Samuel M,F
+Rohan S,Child,Samuel M,M
+Liam,Child,Sara,M
+Melat,Child,Mekonen,F
+Salem (Sally),Child,Mekonen,F
+Aaron,Child,Mekonen,M
+Joseph,Child,Mekonen,M
+Feybien\n(Feven),Child,Bethlehem,F
+Selolya\n(Lolo),Child,Bethlehem,F
+Yodit,Child,Bethlehem,F
+Yafet,Child,Bethlehem,M
+Jacob,Child,Rahel,M
+Kaleb,Child,Nebiat,M
+Rohan,Child,Nebiat,M
+Jaden,Child,Nebiat,M
+Sabrina,Child,Alem Isaac,F
+Yonathan A,Child,Alem Isaac,M
+Nathan,Child,Alem Isaac,M
+Naomi,Child,Kibrom,F
+Natan,Child,Kibrom,M
+Bruk,Child,Kibrom,M
+Lucas,Child,Kibrom,M
+Jonah,Child,Yonas N,M
+Eden,Child,Yonas N,F
+Meriam,Child,Yonas K,F
+Isey,Child,Yonas K,M
+Sam,Child,Yonas K,M
+Aman,Child,Yonas K,M
+Elias,Child,Yonas K,M
+Natnael,Child,Fasil K,M
+Nahom,Child,Fasil K,M
+Yayelna,Child,Amanuel,F
+Natahan,Child,Amanuel,M
+Yoel A,Child,Amanuel,M
+Yohan,Child,Amanuel,M
+Henok,Child,Mihret,M
+Snit,Child,Mihret,F
+Abigail,Child,Mihret,F
+#Dagnew Hadera,Spouse,Almaz,M
+Delina Hadera,Child,Almaz,F
+Abiel Hadera,Child,Almaz,M
+#Semere Solomon,Spouse,Nigisti,M
+Bnehur Semere,Child,Nigisti,M
+Betelihem\nSemere,Child,Nigisti,F
+Mekseb Semere,Child,Nigisti,F
+#Akberet Ghirmay,Spouse,Yohannes I,F
+Dilyet,Child,Yohannes I,F
+Adonay,Child,Yohannes I,M
+Senay,Child,Yohannes I,M
+#Kibret Abraha,Spouse,Mebrat Isaac,M
+Marina,Child,Mebrat Isaac,F

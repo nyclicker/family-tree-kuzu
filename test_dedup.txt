@@ -1,0 +1,6 @@
+Person 1,Relation,Person 2,Gender,Details
+John Smith,Earliest Ancestor,,M,First John
+Mary Jones,Child,John Smith,F,
+John Brown,Child,Mary Jones,M,Second John
+Alice Johnson,Child,John Brown,F,
+John Green,Child,Alice Johnson,M,Third John
