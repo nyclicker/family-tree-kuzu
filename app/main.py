@@ -12,8 +12,6 @@ from .models import Base, Tree, TreeVersion
 from . import crud, schemas, graph
 from .importers.family_tree_text import parse_family_tree_txt, build_people_set, build_relationship_requests, detect_duplicates
 from .importers.family_tree_json import parse_family_tree_json, extract_people_for_import, extract_relationships_for_import
-#from .plotly_graph.db_plotly import build_plotly_figure_from_db
-#from .plotly_graph.plotly_render import build_plotly_figure_from_db
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
