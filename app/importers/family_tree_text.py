@@ -8,8 +8,8 @@ from typing import Dict, List, Optional, Tuple
 
 REL_MAP = {
     "Child": "CHILD_OF",
-    # Add more mappings here if you support them
-    # "Spouse": "SPOUSE_OF",
+    "Parent": "PARENT_OF",
+    "Spouse": "SPOUSE_OF",
 }
 
 SKIP_RELATIONS = {"Earliest Ancestor"}  # no relationship row
@@ -120,16 +120,13 @@ def parse_family_tree_txt(path: str | Path) -> List[ParsedRow]:
         p1_parts = person1.split()
         p1_first = p1_parts[0] if p1_parts else person1
         
-        # For "Child" relationships, always combine person1 with parent name (person2)
-        # to create a unique key: "FirstName (ParentName)"
-        # This distinguishes people with same first name but different parents
-        if relation.lower() == "child" and person2:
-            p1_key = f"{person1} ({person2})"
-            p2_key = person2  # Parent's key is just their name
-        else:
-            # For non-child relationships (Spouse, etc), use person1 as-is
-            p1_key = person1
-            p2_key = person2 if person2 else ""
+        # Unique key generation based on relationship type:
+        # Use person1 name as the primary key. The parent/child context
+        # is used for relationship disambiguation, not person identity.
+        # This ensures the same person isn't created twice when listed
+        # as a child of multiple parents (e.g., both spouses).
+        p1_key = person1
+        p2_key = person2 if person2 else ""
 
         rows.append(
             ParsedRow(
@@ -269,12 +266,9 @@ def build_relationship_requests(
             warnings.append(f"Line {r.line_no}: Skipped unknown relation '{r.relation}' (will support in future)")
             continue
         
-        # Only process CHILD_OF relationships for now
+        # Process different relationship types
         rel_type = REL_MAP[r.relation]
-        if rel_type != "CHILD_OF":
-            warnings.append(f"Line {r.line_no}: Skipped relation type '{rel_type}' (not yet supported)")
-            continue
-
+        
         # must reference an existing person2 (as per your rule)
         # Person2 is referenced by their original name, but we need to find their unique key
         if r.person2:
@@ -292,7 +286,7 @@ def build_relationship_requests(
             
             if not valid_entries:
                 warnings.append(
-                    f"Line {r.line_no}: Person 2 '{r.person2}' not found before this line (parent must be defined first)"
+                    f"Line {r.line_no}: Person 2 '{r.person2}' not found before this line (must be defined first)"
                 )
                 continue
             
@@ -304,18 +298,89 @@ def build_relationship_requests(
             warnings.append(f"Line {r.line_no}: Person 2 is required for relation '{r.relation}'")
             continue
 
-        # child = Person1 (person1's ID) - use unique key
+        # child/parent/spouse = Person1 (person1's ID) - use unique key
         from_id = name_to_id[r.person1_key]
 
-        rels.append(
-            (
-                r.line_no,
-                {
-                    "from_person_id": from_id,
-                    "to_person_id": to_id,
-                    "type": REL_MAP[r.relation],
-                },
+        # Build relationship based on type
+        if rel_type == "CHILD_OF":
+            # Person1 is child, Person2 is parent
+            # from_person_id = child, to_person_id = parent
+            rels.append(
+                (
+                    r.line_no,
+                    {
+                        "from_person_id": from_id,
+                        "to_person_id": to_id,
+                        "type": "CHILD_OF",
+                    },
+                )
             )
-        )
+        elif rel_type == "PARENT_OF":
+            # Person1 is parent, Person2 is child
+            # from_person_id = child, to_person_id = parent
+            # Reverse the direction to maintain CHILD_OF semantics
+            rels.append(
+                (
+                    r.line_no,
+                    {
+                        "from_person_id": to_id,  # child (person2)
+                        "to_person_id": from_id,  # parent (person1)
+                        "type": "CHILD_OF",
+                    },
+                )
+            )
+        elif rel_type == "SPOUSE_OF":
+            # Person1 and Person2 are spouses
+            # Bidirectional relationship
+            rels.append(
+                (
+                    r.line_no,
+                    {
+                        "from_person_id": from_id,
+                        "to_person_id": to_id,
+                        "type": "SPOUSE_OF",
+                    },
+                )
+            )
 
-    return rels, warnings
+    # Deduplicate child relationships
+    # Track (child_id, parent_id) pairs to avoid duplicates
+    # Also track which children already have a parent to prevent multiple parents
+    seen_child_relationships = set()
+    children_with_parent = {}  # child_id -> (parent_id, line_no)
+    deduped_rels = []
+    duplicate_count = 0
+    
+    for line_no, rel_data in rels:
+        if rel_data["type"] == "CHILD_OF":
+            child_id = rel_data["from_person_id"]
+            parent_id = rel_data["to_person_id"]
+            rel_key = (child_id, parent_id)
+            
+            # Check for exact duplicate (same child, same parent)
+            if rel_key in seen_child_relationships:
+                duplicate_count += 1
+                warnings.append(
+                    f"Line {line_no}: Skipped duplicate child relationship (child already linked to this parent)"
+                )
+                continue
+            
+            # Check if child already has a different parent
+            if child_id in children_with_parent:
+                existing_parent_id, existing_line = children_with_parent[child_id]
+                if existing_parent_id != parent_id:
+                    duplicate_count += 1
+                    warnings.append(
+                        f"Line {line_no}: Skipped child relationship (child already has a parent from line {existing_line})"
+                    )
+                    continue
+            
+            seen_child_relationships.add(rel_key)
+            children_with_parent[child_id] = (parent_id, line_no)
+        
+        # Add relationship to deduped list (after validation)
+        deduped_rels.append((line_no, rel_data))    
+    if duplicate_count > 0:
+        warnings.append(f"Deduplicated {duplicate_count} child relationship(s)")
+    
+    return deduped_rels, warnings

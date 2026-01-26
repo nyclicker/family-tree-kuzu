@@ -24,6 +24,19 @@ def list_people(db: Session, tree_id: int | None = None, tree_version_id: int | 
             q = q.filter(Person.tree_id == tree_id)
     return q.order_by(Person.display_name.asc()).all()
 
+def list_relationships(db: Session, tree_id: int | None = None, tree_version_id: int | None = None):
+    q = db.query(Relationship)
+    if tree_version_id is not None:
+        q = q.filter(Relationship.tree_version_id == tree_version_id)
+    elif tree_id is not None:
+        # find active version for this tree
+        tv = db.query(TreeVersion).filter(TreeVersion.tree_id == tree_id, TreeVersion.active == True).order_by(TreeVersion.version.desc()).first()
+        if tv:
+            q = q.filter(Relationship.tree_version_id == tv.id)
+        else:
+            q = q.filter(Relationship.tree_id == tree_id)
+    return q.all()
+
 def create_relationship(db: Session, from_id: str, to_id: str | None, rel_type: str, tree_id: int | None = None, tree_version_id: int | None = None):
     rt = RelType(rel_type)
 

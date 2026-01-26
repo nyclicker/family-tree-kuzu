@@ -12,6 +12,7 @@ class Sex(enum.Enum):
 
 class RelType(enum.Enum):
     CHILD_OF = "CHILD_OF"
+    SPOUSE_OF = "SPOUSE_OF"
     EARLIEST_ANCESTOR = "EARLIEST_ANCESTOR"
 
 

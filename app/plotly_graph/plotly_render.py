@@ -79,9 +79,77 @@ def build_maps(rows: List[LegacyRow]):
 
     return children_map, parents_map, gender_map, display_name, hover_name, roots
 
+def adjust_spouse_positions(
+    pos: Dict[str, Tuple[float, float]],
+    spouse_map: Dict[str, List[str]],
+    children_map: Dict[str, List[str]],
+    parents_map: Dict[str, List[str]]
+) -> Dict[str, Tuple[float, float]]:
+    """
+    Adjust positions so spouses are positioned side-by-side.
+    Strategy: For each spouse pair, position them at a small horizontal offset from each other,
+    while keeping their vertical position (radial distance) the same.
+    Uses dynamic spacing based on the number of children.
+    """
+    adjusted_pos = dict(pos)
+    processed_pairs = set()
+    
+    for person1, spouses in spouse_map.items():
+        if person1 not in adjusted_pos:
+            continue
+            
+        for person2 in spouses:
+            if person2 not in adjusted_pos:
+                continue
+            
+            # Avoid processing the same pair twice
+            pair_key = tuple(sorted([person1, person2]))
+            if pair_key in processed_pairs:
+                continue
+            processed_pairs.add(pair_key)
+            
+            # Get current positions
+            x1, y1 = adjusted_pos[person1]
+            x2, y2 = adjusted_pos[person2]
+            
+            # Calculate midpoint
+            mid_x = (x1 + x2) / 2.0
+            mid_y = (y1 + y2) / 2.0
+            
+            # Get all children to determine spacing
+            children1 = children_map.get(person1, [])
+            children2 = children_map.get(person2, [])
+            all_children = set(children1 + children2)
+            num_children = len(all_children)
+            
+            # Dynamic offset based on number of children
+            # More children = need more horizontal space between spouses
+            if num_children > 8:
+                offset = 0.6
+            elif num_children > 5:
+                offset = 0.5
+            elif num_children > 3:
+                offset = 0.4
+            else:
+                offset = 0.3
+            
+            # Position spouses symmetrically around midpoint
+            adjusted_pos[person1] = (mid_x - offset, mid_y)
+            adjusted_pos[person2] = (mid_x + offset, mid_y)
+            
+            # If they have children, ensure children are positioned below the midpoint
+            for child_id in all_children:
+                if child_id in adjusted_pos:
+                    child_x, child_y = adjusted_pos[child_id]
+                    # Keep child's original y position (or move it down if needed)
+                    # Update x to be centered under the spouse pair
+                    adjusted_pos[child_id] = (mid_x, child_y)
+    
+    return adjusted_pos
+
 # Main Graph Builder Code
 def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], published_ids: set | None = None, layer_gap: float = 4.0) -> go.Figure:
-    children_map, parents_map, gender_map, display_name, hover_name, roots = build_maps_from_db(people, rels)
+    children_map, parents_map, gender_map, display_name, hover_name, roots, spouse_map = build_maps_from_db(people, rels)
 
     if not roots:
         fig = go.Figure()
@@ -115,7 +183,34 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
     # DEBUG: published_ids logging removed
     # End Debug Code
     """
-    pos = radial_tree_layout_balanced_spaced(children_map, roots, layer_gap=layer_gap)
+    
+    # Calculate dynamic spacing based on tree density
+    total_nodes = len(people)
+    max_children = max([len(kids) for kids in children_map.values()] + [1])
+    
+    # Adjust layer_gap based on number of nodes and max children per parent
+    # More nodes or more children per parent = need more spacing
+    if total_nodes > 300:
+        layer_gap = max(layer_gap * 1.5, 6.0)
+        child_padding = 0.05
+    elif total_nodes > 150:
+        layer_gap = max(layer_gap * 1.3, 5.0)
+        child_padding = 0.04
+    elif max_children > 8:
+        layer_gap = max(layer_gap * 1.2, 4.8)
+        child_padding = 0.04
+    else:
+        child_padding = 0.03
+    
+    pos = radial_tree_layout_balanced_spaced(
+        children_map, 
+        roots, 
+        layer_gap=layer_gap,
+        child_padding=child_padding
+    )
+    
+    # Adjust positions for spouses to be side-by-side
+    pos = adjust_spouse_positions(pos, spouse_map, children_map, parents_map)
 
     # Place draft-only nodes in a top-right stacked area. Prefer explicit
     # published id set if provided; fall back to historic isdigit() heuristic.
@@ -182,6 +277,51 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
         line=dict(width=1, color="gray"),
         hoverinfo="none",
         customdata=edge_customdata,  # <-- NEW (optional)
+    )
+
+    # Build spouse edge segments
+    spouse_x, spouse_y = [], []
+    spouse_customdata = []
+    
+    # Index spouse relationships
+    spouse_rel_ids = {}
+    for r in rels:
+        if str(r.type) == "RelType.SPOUSE_OF" or getattr(r.type, "value", None) == "SPOUSE_OF":
+            person1_id = str(r.from_person_id)
+            person2_id = str(r.to_person_id) if r.to_person_id else None
+            if person2_id:
+                # Store both directions to avoid duplicate edges
+                pair = tuple(sorted([person1_id, person2_id]))
+                if pair not in spouse_rel_ids:
+                    spouse_rel_ids[pair] = r.id
+    
+    # Build spouse edges
+    for person1_id in spouse_map:
+        for person2_id in spouse_map[person1_id]:
+            # Only draw each edge once (avoid duplicates)
+            pair = tuple(sorted([person1_id, person2_id]))
+            if pair in spouse_rel_ids and person1_id < person2_id:  # Only process once per pair
+                if person1_id in pos and person2_id in pos:
+                    x0, y0 = pos[person1_id]
+                    x1, y1 = pos[person2_id]
+                    spouse_x += [x0, x1, None]
+                    spouse_y += [y0, y1, None]
+                    
+                    rid = spouse_rel_ids[pair]
+                    spouse_customdata += [
+                        {"relationship_id": rid, "spouse1_id": person1_id, "spouse2_id": person2_id},
+                        {"relationship_id": rid, "spouse1_id": person1_id, "spouse2_id": person2_id},
+                        None,
+                    ]
+    
+    spouse_trace = go.Scatter(
+        x=spouse_x,
+        y=spouse_y,
+        mode="lines",
+        line=dict(width=2, color="#E91E63", dash="dot"),  # Pink dashed line
+        hoverinfo="text",
+        hovertext=["Spouse relationship" if cd else "" for cd in spouse_customdata],
+        customdata=spouse_customdata,
     )
 
     nodes = list(pos.keys())  # these are person_ids
@@ -258,7 +398,7 @@ def build_plotly_figure_from_db(people: List[Person], rels: List[Relationship], 
         textfont=dict(size=9),
     )
 
-    fig = go.Figure(data=[edge_trace, node_trace])
+    fig = go.Figure(data=[edge_trace, spouse_trace, node_trace])
 
     # compute bounds from your node positions (pos: dict[node_id] -> (x,y))
     xs = [xy[0] for xy in pos.values()]
@@ -314,9 +454,11 @@ def build_maps_from_db(
     Dict[str, str],        # display_name (person_id -> label)
     Dict[str, str],        # hover_name   (person_id -> hover label)
     List[str],             # roots        ([root_id])
+    Dict[str, List[str]],  # spouse_map   (person_id -> [spouse_id])
 ]:
     children_map: Dict[str, List[str]] = {}
     parents_map: Dict[str, List[str]] = {}
+    spouse_map: Dict[str, List[str]] = {}
     gender_map: Dict[str, str] = {}
     display_name: Dict[str, str] = {}
     hover_name: Dict[str, str] = {}
@@ -335,7 +477,7 @@ def build_maps_from_db(
     explicit_roots: List[str] = []
     for r in rels:
         a = str(r.from_person_id)
-        b = str(r.to_person_id)
+        b = str(r.to_person_id) if r.to_person_id else None
 
         if r.type == RelType.EARLIEST_ANCESTOR:
             # convention: from_person is the root; to_person can be ignored or set to self
@@ -343,9 +485,16 @@ def build_maps_from_db(
 
         elif r.type == RelType.CHILD_OF:
             # convention: from_person is the child, to_person is the parent
-            child_id, parent_id = a, b
-            children_map.setdefault(parent_id, []).append(child_id)
-            parents_map.setdefault(child_id, []).append(parent_id)
+            if b:
+                child_id, parent_id = a, b
+                children_map.setdefault(parent_id, []).append(child_id)
+                parents_map.setdefault(child_id, []).append(parent_id)
+
+        elif r.type == RelType.SPOUSE_OF:
+            # bidirectional spouse relationship
+            if b:
+                spouse_map.setdefault(a, []).append(b)
+                spouse_map.setdefault(b, []).append(a)
 
     # pick roots
     roots = explicit_roots[:]
@@ -356,7 +505,7 @@ def build_maps_from_db(
         child_ids = set(parents_map.keys())
         roots = sorted(list(all_ids - child_ids))
 
-    return children_map, parents_map, gender_map, display_name, hover_name, roots
+    return children_map, parents_map, gender_map, display_name, hover_name, roots, spouse_map
 
 
 """

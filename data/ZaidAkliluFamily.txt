@@ -24,7 +24,6 @@ Maru,Child,Teweldeberhan,F
 Gimja,Child,Teweldeberhan,F
 Abeba T,Child,Teweldeberhan,F
 Fireweini,Child,Teweldeberhan,F
-Weldeamlak II,Child,Weldegiorghis,M,
 Desta,Child,Weldegiorghis,F,
 Gebriel,Child,Weldegiorghis,M,
 Gebrenegus,Child,Weldegiorghis,M,
@@ -395,11 +394,5 @@ Tuccu,Spouse,Dehab,M
 Aklilu,Child,Dehab,M
 Solomon,Child,Dehab,M
 Selamawit,Child,Dehab,F
-Lulia,Child,Aklilu,F
-Natalia,Child,Aklilu,F
-Sophie,Child,Solomon,F
-Simona,Child,Solomon,F
-Elnathan,Child,Selamawit,M
-Sesina,Child,Selamawit,F
 London,Child,Lidya,M
 Adu (LJ),Child,Lidya,M

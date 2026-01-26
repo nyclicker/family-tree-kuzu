@@ -9,12 +9,16 @@ let ctxMode = "normal"; // "normal" | "pick-parent"
 let selectedChild = null; // { id, label }
 let selectedChildLabel = null;
 let parentPickMode = false; // when true: left-click picks a parent
+let childPickMode = false; // when true: left-click picks a child for PARENT_OF
+let spousePickMode = false; // when true: left-click picks a spouse for SPOUSE_OF
+let pickSourcePerson = null; // source person for relationship pick modes
 // multi-tree state
 let activeTreeId = null;
 let activeTreeVersionId = null; // published active version id
 let workingDrafts = []; // cached drafts for current base version
 let unsavedCount = 0;
 let treesCache = [];
+let relationshipsCache = []; // cached relationships for validation
 
 // If your Plotly trace uses customdata for person_id, set this true.
 const NODE_ID_FROM_CUSTOMDATA = true;
@@ -23,20 +27,79 @@ function clearParentPick() {
   selectedChildId = null;
   selectedChildLabel = null;
   parentPickMode = false;
+  childPickMode = false;
+  spousePickMode = false;
+  pickSourcePerson = null;
   setStatus("");
+}
+
+function getParentOf(personId) {
+  // Returns parent ID if person has a CHILD_OF relationship, null otherwise
+  const rel = relationshipsCache.find(r => r.from_person_id === personId && r.type === 'CHILD_OF');
+  return rel ? rel.to_person_id : null;
+}
+
+function hasParent(personId) {
+  return getParentOf(personId) !== null;
 }
 
 function enterParentPick(child) {
   selectedChildId = child.id;
   selectedChildLabel = child.label;
   parentPickMode = true;
+  childPickMode = false;
+  spousePickMode = false;
+  pickSourcePerson = child;
   setStatus(`Pick a parent for "${selectedChildLabel}" (left-click a node). Right-click background to cancel.`);
+}
+
+function enterChildPick(parent) {
+  pickSourcePerson = parent;
+  parentPickMode = false;
+  childPickMode = true;
+  spousePickMode = false;
+  setStatus(`Pick a child for "${parent.label}" (left-click a node). Right-click background to cancel.`);
+}
+
+function enterSpousePick(person) {
+  pickSourcePerson = person;
+  parentPickMode = false;
+  childPickMode = false;
+  spousePickMode = true;
+  setStatus(`Pick a spouse for "${person.label}" (left-click a node). Right-click background to cancel.`);
 }
 
 async function fetchJSON(url, opts) {
   const r = await fetch(url, opts);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
+}
+
+async function refreshRelationshipsCache() {
+  if (!activeTreeId) {
+    relationshipsCache = [];
+    return;
+  }
+  
+  try {
+    const params = [`tree_id=${encodeURIComponent(activeTreeId)}`];
+    if (activeTreeVersionId) params.push(`tree_version_id=${encodeURIComponent(activeTreeVersionId)}`);
+    const url = `/relationships?${params.join('&')}`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error('Failed to fetch relationships');
+      relationshipsCache = [];
+      return;
+    }
+    
+    const data = await response.json();
+    relationshipsCache = data;
+    console.log('Relationships cache updated:', relationshipsCache.length, 'relationships');
+  } catch (err) {
+    console.error('Error fetching relationships:', err);
+    relationshipsCache = [];
+  }
 }
 
 async function refreshPeopleDropdowns() {
@@ -111,8 +174,20 @@ function showNodeMenu(x, y) {
   // show only node actions
   document.getElementById("ctxEditPerson").style.display = "block";
   document.getElementById("ctxAddPerson").style.display = "none";
-  document.getElementById("ctxAddChildOf").style.display = "block";
   document.getElementById("ctxDeletePerson").style.display = "block";
+  
+  // Validate relationship options for this person
+  const personHasParent = lastRightClickedPerson ? hasParent(lastRightClickedPerson.id) : false;
+  
+  // Add Child: only if clicked person doesn't already have a parent
+  document.getElementById("ctxAddChildOf").style.display = personHasParent ? "none" : "block";
+  
+  // Add Parent: always allow (user will pick a parent for this person)
+  document.getElementById("ctxAddParentOf").style.display = "block";
+  
+  // Add Spouse: always allow
+  document.getElementById("ctxAddSpouseOf").style.display = "block";
+  
   // hide relationship delete when node menu shown
   const delRelBtn = document.getElementById("ctxDeleteRelationship");
   if (delRelBtn) delRelBtn.style.display = "none";
@@ -124,6 +199,8 @@ function showBackgroundMenu(x, y) {
   document.getElementById("ctxEditPerson").style.display = "none";
   document.getElementById("ctxAddPerson").style.display = "block";
   document.getElementById("ctxAddChildOf").style.display = "none";
+  document.getElementById("ctxAddParentOf").style.display = "none";
+  document.getElementById("ctxAddSpouseOf").style.display = "none";
   document.getElementById("ctxDeletePerson").style.display = "none";
   const delRelBtn = document.getElementById("ctxDeleteRelationship");
   if (delRelBtn) delRelBtn.style.display = "none";
@@ -135,6 +212,8 @@ function showEdgeMenu(x, y) {
   const editBtn = document.getElementById("ctxEditPerson"); if (editBtn) editBtn.style.display = "none";
   const addBtn = document.getElementById("ctxAddPerson"); if (addBtn) addBtn.style.display = "none";
   const addChildBtn = document.getElementById("ctxAddChildOf"); if (addChildBtn) addChildBtn.style.display = "none";
+  const addParentBtn = document.getElementById("ctxAddParentOf"); if (addParentBtn) addParentBtn.style.display = "none";
+  const addSpouseBtn = document.getElementById("ctxAddSpouseOf"); if (addSpouseBtn) addSpouseBtn.style.display = "none";
   const delPersonBtn = document.getElementById("ctxDeletePerson"); if (delPersonBtn) delPersonBtn.style.display = "none";
   const delRelBtn = document.getElementById("ctxDeleteRelationship"); if (delRelBtn) delRelBtn.style.display = "block";
   showMenuAt(x, y);
@@ -153,6 +232,9 @@ async function drawGraph() {
   }
 
   try {
+    // Fetch relationships for validation
+    await refreshRelationshipsCache();
+    
     let url = '/api/plotly';
     const params = [];
     if (activeTreeId) params.push(`tree_id=${encodeURIComponent(activeTreeId)}`);
@@ -213,20 +295,74 @@ async function drawGraph() {
     // Otherwise treat as node click
     const person = personFromPlotlyPoint(p);
     console.log("[plotly_click] clicked person:", person,
-      "parentPickMode:", parentPickMode, "selectedChildId:", selectedChildId
+      "parentPickMode:", parentPickMode, "childPickMode:", childPickMode, "spousePickMode:", spousePickMode
     );
     if (!person) return;
 
     if (parentPickMode) {
-      // left-click chooses parent
+      // left-click chooses parent for the clicked child
       if (person.id === selectedChildId) {
         setStatus("Pick a different person (cannot relate to self).");
+        return;
+      }
+      
+      // Validate: the child shouldn't already have a parent
+      if (hasParent(selectedChildId)) {
+        setStatus(`${selectedChildLabel} already has a parent. Cannot add another parent.`);
+        clearParentPick();
         return;
       }
 
       createChildOf(selectedChildId, person.id)
         .then(async () => {
           setStatus(`Added: ${selectedChildLabel} CHILD_OF ${person.label}`);
+          clearParentPick();
+          await drawGraph();
+        })
+        .catch((err) => {
+          console.error(err);
+          setStatus(`Error adding relationship: ${err.message || err}`);
+        });
+      return;
+    }
+
+    if (childPickMode) {
+      // left-click chooses child for PARENT_OF relationship
+      if (person.id === pickSourcePerson.id) {
+        setStatus("Pick a different person (cannot relate to self).");
+        return;
+      }
+      
+      // Validate: the child shouldn't already have a parent
+      if (hasParent(person.id)) {
+        setStatus(`${person.label} already has a parent. Cannot add as child.`);
+        clearParentPick();
+        return;
+      }
+
+      createParentOf(pickSourcePerson.id, person.id)
+        .then(async () => {
+          setStatus(`Added: ${pickSourcePerson.label} PARENT_OF ${person.label}`);
+          clearParentPick();
+          await drawGraph();
+        })
+        .catch((err) => {
+          console.error(err);
+          setStatus(`Error adding relationship: ${err.message || err}`);
+        });
+      return;
+    }
+
+    if (spousePickMode) {
+      // left-click chooses spouse for SPOUSE_OF relationship
+      if (person.id === pickSourcePerson.id) {
+        setStatus("Pick a different person (cannot relate to self).");
+        return;
+      }
+
+      createSpouseOf(pickSourcePerson.id, person.id)
+        .then(async () => {
+          setStatus(`Added: ${pickSourcePerson.label} SPOUSE_OF ${person.label}`);
           clearParentPick();
           await drawGraph();
         })
@@ -854,6 +990,18 @@ document.getElementById("ctxAddChildOf").onclick = async () => {
   enterParentPick(lastRightClickedPerson);
 };
 
+document.getElementById("ctxAddParentOf").onclick = async () => {
+  hideMenu();
+  if (!lastRightClickedPerson) return;
+  enterChildPick(lastRightClickedPerson);
+};
+
+document.getElementById("ctxAddSpouseOf").onclick = async () => {
+  hideMenu();
+  if (!lastRightClickedPerson) return;
+  enterSpousePick(lastRightClickedPerson);
+};
+
 document.getElementById("ctxAddPerson").onclick = async () => {
   hideMenu();
   if (parentPickMode) clearParentPick();
@@ -924,6 +1072,12 @@ document.getElementById("ctxEditPerson").addEventListener("click", () => {
 function initContextMenuBindings() {
   const addChildBtn = document.getElementById('ctxAddChildOf');
   if (addChildBtn) addChildBtn.onclick = async () => { hideMenu(); if (!lastRightClickedPerson) return; enterParentPick(lastRightClickedPerson); };
+
+  const addParentBtn = document.getElementById('ctxAddParentOf');
+  if (addParentBtn) addParentBtn.onclick = async () => { hideMenu(); if (!lastRightClickedPerson) return; enterChildPick(lastRightClickedPerson); };
+
+  const addSpouseBtn = document.getElementById('ctxAddSpouseOf');
+  if (addSpouseBtn) addSpouseBtn.onclick = async () => { hideMenu(); if (!lastRightClickedPerson) return; enterSpousePick(lastRightClickedPerson); };
 
   const addPersonBtn = document.getElementById('ctxAddPerson');
   if (addPersonBtn) addPersonBtn.onclick = async () => {
@@ -1094,6 +1248,37 @@ async function createChildOf(childId, parentId) {
   try {
     await createDraft("relationship", { from_person_id: childId, to_person_id: parentId, type: "CHILD_OF", op: "replace" });
     setStatus("Saved draft relationship");
+    return { ok: true };
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function createParentOf(parentId, childId) {
+  if (!activeTreeId || !activeTreeVersionId) {
+    setStatus("Select a tree/version first to create drafts.");
+    throw new Error("No active tree/version");
+  }
+
+  try {
+    // PARENT_OF is stored as reversed CHILD_OF: child->parent
+    await createDraft("relationship", { from_person_id: childId, to_person_id: parentId, type: "CHILD_OF", op: "replace" });
+    setStatus("Saved draft PARENT_OF relationship");
+    return { ok: true };
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function createSpouseOf(person1Id, person2Id) {
+  if (!activeTreeId || !activeTreeVersionId) {
+    setStatus("Select a tree/version first to create drafts.");
+    throw new Error("No active tree/version");
+  }
+
+  try {
+    await createDraft("relationship", { from_person_id: person1Id, to_person_id: person2Id, type: "SPOUSE_OF", op: "replace" });
+    setStatus("Saved draft SPOUSE_OF relationship");
     return { ok: true };
   } catch (err) {
     throw err;

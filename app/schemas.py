@@ -31,7 +31,7 @@ class PersonOut(BaseModel):
 class RelCreate(BaseModel):
     from_person_id: str
     to_person_id: Optional[str]
-    type: Literal["CHILD_OF","EARLIEST_ANCESTOR"]
+    type: Literal["CHILD_OF","EARLIEST_ANCESTOR","SPOUSE_OF"]
     tree_id: Optional[int] = None
     tree_version_id: Optional[int] = None
 
@@ -41,10 +41,19 @@ class RelCreate(BaseModel):
         # if earliest ancestor, to_person_id must be empty
         if info.data.get("type") == "EARLIEST_ANCESTOR":
             return None
-        # if child_of, must provide parent id
+        # if child_of or spouse_of, must provide the other person id
         if not v:
-            raise ValueError("to_person_id is required for CHILD_OF")
+            raise ValueError("to_person_id is required for CHILD_OF and SPOUSE_OF")
         return v
+
+class RelationshipOut(BaseModel):
+    id: str
+    from_person_id: str
+    to_person_id: Optional[str]
+    type: str
+    tree_id: Optional[int] = None
+    tree_version_id: Optional[int] = None
+    version: int
 
 
 class TreeImportRequest(BaseModel):

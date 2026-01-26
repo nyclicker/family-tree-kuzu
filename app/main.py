@@ -41,6 +41,14 @@ def people(
 def add_person(body: schemas.PersonCreate, db: Session = Depends(get_db)):
     return crud.create_person(db, body.display_name, body.sex, body.notes, tree_id=body.tree_id, tree_version_id=body.tree_version_id)
 
+@app.get("/relationships", response_model=list[schemas.RelationshipOut])
+def get_relationships(
+    tree_id: int | None = Query(None, description="Optional tree id to filter by"),
+    tree_version_id: int | None = Query(None, description="Optional tree version id to filter by"),
+    db: Session = Depends(get_db),
+):
+    return crud.list_relationships(db, tree_id=tree_id, tree_version_id=tree_version_id)
+
 @app.post("/relationships")
 def add_rel(body: schemas.RelCreate, db: Session = Depends(get_db)):
     return crud.create_relationship(db, body.from_person_id, body.to_person_id, body.type, tree_id=body.tree_id, tree_version_id=body.tree_version_id)
