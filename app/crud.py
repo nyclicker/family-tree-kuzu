@@ -24,6 +24,43 @@ def list_people(db: Session, tree_id: int | None = None, tree_version_id: int | 
             q = q.filter(Person.tree_id == tree_id)
     return q.order_by(Person.display_name.asc()).all()
 
+def get_person(db: Session, person_id: str) -> Person | None:
+    """Get a single person by ID."""
+    return db.query(Person).filter(Person.id == person_id).first()
+
+def update_person(db: Session, person_id: str, updates: dict) -> Person | None:
+    """Update a person's fields."""
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        return None
+    
+    for key, value in updates.items():
+        if hasattr(person, key):
+            if key == "sex" and value:
+                setattr(person, key, Sex(value))
+            else:
+                setattr(person, key, value)
+    
+    db.commit()
+    db.refresh(person)
+    return person
+
+def delete_person(db: Session, person_id: str) -> bool:
+    """Delete a person and their relationships."""
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        return False
+    
+    # Delete related relationships
+    db.query(Relationship).filter(
+        (Relationship.from_person_id == person_id) | 
+        (Relationship.to_person_id == person_id)
+    ).delete(synchronize_session=False)
+    
+    db.delete(person)
+    db.commit()
+    return True
+
 def list_relationships(db: Session, tree_id: int | None = None, tree_version_id: int | None = None):
     q = db.query(Relationship)
     if tree_version_id is not None:
@@ -36,6 +73,20 @@ def list_relationships(db: Session, tree_id: int | None = None, tree_version_id:
         else:
             q = q.filter(Relationship.tree_id == tree_id)
     return q.all()
+
+def get_relationship(db: Session, rel_id: str) -> Relationship | None:
+    """Get a single relationship by ID."""
+    return db.query(Relationship).filter(Relationship.id == rel_id).first()
+
+def delete_relationship(db: Session, rel_id: str) -> bool:
+    """Delete a relationship."""
+    rel = db.query(Relationship).filter(Relationship.id == rel_id).first()
+    if not rel:
+        return False
+    
+    db.delete(rel)
+    db.commit()
+    return True
 
 def create_relationship(db: Session, from_id: str, to_id: str | None, rel_type: str, tree_id: int | None = None, tree_version_id: int | None = None):
     rt = RelType(rel_type)

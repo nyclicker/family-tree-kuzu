@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional, Literal
 
 
@@ -35,16 +35,15 @@ class RelCreate(BaseModel):
     tree_id: Optional[int] = None
     tree_version_id: Optional[int] = None
 
-    @field_validator("to_person_id")
-    @classmethod
-    def validate_to_person_id(cls, v, info):
+    @model_validator(mode='after')
+    def validate_relationship(self):
         # if earliest ancestor, to_person_id must be empty
-        if info.data.get("type") == "EARLIEST_ANCESTOR":
-            return None
+        if self.type == "EARLIEST_ANCESTOR":
+            self.to_person_id = None
         # if child_of or spouse_of, must provide the other person id
-        if not v:
+        elif not self.to_person_id:
             raise ValueError("to_person_id is required for CHILD_OF and SPOUSE_OF")
-        return v
+        return self
 
 class RelationshipOut(BaseModel):
     id: str

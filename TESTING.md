@@ -1,7 +1,21 @@
-# Family Tree Frontend - Automated Testing
+# Family Tree - Automated Testing Guide
 
 ## Quick Start
 
+### Backend Tests (Python)
+```bash
+# Install dependencies
+pip install -e .
+pip install pytest pytest-cov
+
+# Run backend tests
+pytest tests/backend/ -v
+
+# Run with coverage report
+pytest tests/backend/ --cov=app --cov-report=html
+```
+
+### Frontend Tests (JavaScript)
 ```bash
 # 1. Install dependencies
 npm install
@@ -11,9 +25,10 @@ npx playwright install chromium
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8888
 
 # 3. Run tests
-npm test                    # Unit tests only
+npm test                    # Unit tests with coverage
 npm run test:e2e           # E2E tests only  
-./tests/run-all-tests.sh   # All tests
+npm run test:all           # All tests
+./tests/run-all-tests.sh   # All tests (comprehensive)
 ```
 
 ## What's Been Fixed
@@ -38,30 +53,66 @@ Recent UX improvements with automated test coverage:
 - Centralized `dismissAllMenus()` function
 - Consistent `clearSelectionHighlights()` before new selections
 
-## Test Files
+## Test Files Structure
 
 ```
 tests/
-├── unit/
-│   └── context-menu.test.js      # Unit tests for JS functions
-├── e2e/
-│   ├── ui-interactions.spec.js   # Comprehensive E2E tests
-│   └── bug-fixes.spec.js         # Targeted bug fix validation
-├── setup.js                       # Jest/mock configuration
-├── README.md                      # This file
-├── TEST_SUITE_SUMMARY.md         # Detailed test documentation
-├── MANUAL_TEST_CHECKLIST.md      # Manual testing guide
-├── run-all-tests.sh              # Run all tests script
-└── validate-setup.sh             # Verify test setup
+├── backend/                                    # Python backend tests (99 tests)
+│   ├── conftest.py                            # Pytest fixtures and DB setup (13 fixtures)
+│   ├── README.md                              # Backend testing guide
+│   ├── unit/                                  # 73 unit tests
+│   │   ├── test_crud.py                       # CRUD operations (23 tests, 100% passing)
+│   │   ├── test_models.py                     # Model validation (27 tests, 100% passing)
+│   │   └── test_schemas.py                    # Pydantic schemas (23 tests, 100% passing)
+│   ├── integration/                           # 26 integration tests
+│   │   └── test_import_workflow.py            # Full import pipeline (26 tests, 100% passing)
+│   └── api/                                   # 41 API tests (pending fix)
+│       ├── test_people_routes.py              # /people endpoints (24 tests)
+│       └── test_relationships_routes.py       # /relationships endpoints (17 tests)
+│
+├── frontend/                                  # JavaScript frontend tests (86+ tests)
+│   ├── README.md                              # Frontend testing guide
+│   ├── unit/
+│   │   ├── context-menu.test.js              # Menu functions
+│   │   ├── import-export.test.js             # Import/export validation
+│   │   └── importer-formats.test.js          # Format handling
+│   └── e2e/
+│       ├── ui-interactions.spec.js           # UI interaction tests
+│       ├── bug-fixes.spec.js                 # Regression tests
+│       └── import-export.spec.js             # Import/export workflows
+│
+├── fixtures/
+│   └── sample-trees.json                      # Test data fixtures
+│
+├── setup.js                                   # Jest configuration
+├── teardown.js                                # Test cleanup
+├── README.md                                  # Testing guide
+├── MANUAL_TEST_CHECKLIST.md                   # Manual testing guide
+├── TEST_SUITE_SUMMARY.md                      # Detailed documentation
+└── run-all-tests.sh                           # Run all tests script
 ```
 
 ## Test Commands
 
 ```bash
-npm test                 # Run Jest unit tests
-npm run test:watch       # Unit tests in watch mode
-npm run test:e2e         # Run Playwright E2E tests
-npm run test:e2e:ui      # E2E tests with UI (interactive)
+# Backend tests (Python)
+pytest tests/backend/ -v                       # Run all backend tests (140 total, 99 passing)
+pytest tests/backend/unit/ -v                  # Run unit tests only (73 tests)
+pytest tests/backend/integration/ -v           # Run integration tests (26 tests)
+pytest tests/backend/unit/test_crud.py -v      # Run specific test file
+pytest tests/backend/ --cov=app                # Run with coverage report (26% overall)
+pytest tests/backend/unit/ -v                  # Unit tests only
+pytest tests/backend/integration/ -v           # Integration tests only
+pytest tests/backend/ --cov=app                # With coverage report
+pytest tests/backend/ --cov=app --cov-report=html  # HTML coverage
+
+# Frontend tests (JavaScript)
+npm test                                       # Jest unit tests with coverage
+npm run test:watch                             # Unit tests in watch mode
+npm run test:coverage                          # Coverage report
+npm run test:e2e                               # Playwright E2E tests
+npm run test:e2e:ui                            # E2E tests with UI
+npm run test:all                               # All tests (unit + e2e)
 ```
 
 ## Configuration

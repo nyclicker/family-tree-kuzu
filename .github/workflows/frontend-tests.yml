@@ -1,0 +1,38 @@
+name: Frontend Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install
+        npx playwright install --with-deps
+
+    - name: Run unit tests
+      run: npm test -- --coverage
+
+    - name: Run E2E tests
+      run: npm run test:e2e
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        files: ./coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage

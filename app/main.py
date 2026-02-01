@@ -39,6 +39,32 @@ def people(
 def add_person(body: schemas.PersonCreate, db: Session = Depends(get_db)):
     return crud.create_person(db, body.display_name, body.sex, body.notes, tree_id=body.tree_id, tree_version_id=body.tree_version_id)
 
+@app.get("/people/{person_id}", response_model=schemas.PersonOut)
+def get_person(person_id: str, db: Session = Depends(get_db)):
+    """Get a single person by ID."""
+    person = crud.get_person(db, person_id)
+    if not person:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Person not found")
+    return person
+
+@app.patch("/people/{person_id}", response_model=schemas.PersonOut)
+def update_person(person_id: str, updates: dict, db: Session = Depends(get_db)):
+    """Update a person's fields."""
+    person = crud.update_person(db, person_id, updates)
+    if not person:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Person not found")
+    return person
+
+@app.delete("/people/{person_id}")
+def delete_person(person_id: str, db: Session = Depends(get_db)):
+    """Delete a person and their relationships."""
+    from fastapi import HTTPException
+    if not crud.delete_person(db, person_id):
+        raise HTTPException(status_code=404, detail="Person not found")
+    return {"ok": True}
+
 @app.get("/relationships", response_model=list[schemas.RelationshipOut])
 def get_relationships(
     tree_id: int | None = Query(None, description="Optional tree id to filter by"),
@@ -50,6 +76,23 @@ def get_relationships(
 @app.post("/relationships")
 def add_rel(body: schemas.RelCreate, db: Session = Depends(get_db)):
     return crud.create_relationship(db, body.from_person_id, body.to_person_id, body.type, tree_id=body.tree_id, tree_version_id=body.tree_version_id)
+
+@app.get("/relationships/{rel_id}", response_model=schemas.RelationshipOut)
+def get_relationship(rel_id: str, db: Session = Depends(get_db)):
+    """Get a single relationship by ID."""
+    rel = crud.get_relationship(db, rel_id)
+    if not rel:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    return rel
+
+@app.delete("/relationships/{rel_id}")
+def delete_relationship(rel_id: str, db: Session = Depends(get_db)):
+    """Delete a relationship."""
+    from fastapi import HTTPException
+    if not crud.delete_relationship(db, rel_id):
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    return {"ok": True}
 
 
 @app.post("/import")

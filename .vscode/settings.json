@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /workspaces/family-tree && pip install -e \\. pytest pytest-cov --quiet && echo \"Dependencies installed\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

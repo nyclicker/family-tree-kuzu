@@ -32,10 +32,13 @@ def main() -> None:
     is_json = file_path.suffix.lower() == ".json"
     is_text_format = file_path.suffix.lower() in (".txt", ".csv")
     
+    rel_reqs = []
+    rel_warnings = []
+
     if is_json:
         json_data = parse_family_tree_json(file_path)
         people_payloads = extract_people_for_import(json_data)
-        rel_reqs = extract_relationships_for_import(json_data, {})  # name_to_id map built below
+        rel_reqs, rel_warnings = extract_relationships_for_import(json_data, {})  # name_to_id map built below
     elif is_text_format:
         rows = parse_family_tree_txt(file_path)
         
@@ -83,8 +86,11 @@ def main() -> None:
 
     # Create relationships
     if is_json:
-        # rel_reqs already populated from extract_relationships_for_import above
-        pass
+        if rel_warnings:
+            print("\n⚠️  RELATIONSHIP WARNINGS:")
+            for warning in rel_warnings:
+                print(f"  - {warning}")
+            print()
     elif is_text_format:
         rel_reqs, rel_warnings = build_relationship_requests(rows, name_to_id)
         if rel_warnings:
