@@ -30,6 +30,7 @@ function clearParentPick() {
   childPickMode = false;
   spousePickMode = false;
   pickSourcePerson = null;
+  updatePickModeIndicator();
   setStatus("");
 }
 
@@ -50,6 +51,7 @@ function enterParentPick(child) {
   childPickMode = false;
   spousePickMode = false;
   pickSourcePerson = child;
+  updatePickModeIndicator();
   setStatus(`Pick a parent for "${selectedChildLabel}" (left-click a node). Right-click background to cancel.`);
 }
 
@@ -58,6 +60,7 @@ function enterChildPick(parent) {
   parentPickMode = false;
   childPickMode = true;
   spousePickMode = false;
+  updatePickModeIndicator();
   setStatus(`Pick a child for "${parent.label}" (left-click a node). Right-click background to cancel.`);
 }
 
@@ -66,6 +69,7 @@ function enterSpousePick(person) {
   parentPickMode = false;
   childPickMode = false;
   spousePickMode = true;
+  updatePickModeIndicator();
   setStatus(`Pick a spouse for "${person.label}" (left-click a node). Right-click background to cancel.`);
 }
 
@@ -1736,9 +1740,346 @@ async function loadSelectedTreeVersion() {
   activeTreeVersionId = active ? active.id : null;
 }
 
+/**
+ * TOOLBAR FUNCTIONALITY
+ */
+
+// Update pick mode indicator in toolbar
+function updatePickModeIndicator() {
+  const indicator = document.getElementById('pickModeIndicator');
+  const text = document.getElementById('pickModeText');
+  
+  if (parentPickMode) {
+    text.textContent = '👤 Click a person to be PARENT';
+    indicator.classList.add('active');
+  } else if (childPickMode) {
+    text.textContent = '👤 Click a person to be CHILD';
+    indicator.classList.add('active');
+  } else if (spousePickMode) {
+    text.textContent = '👥 Click a person to be SPOUSE';
+    indicator.classList.add('active');
+  } else {
+    indicator.classList.remove('active');
+  }
+}
+
+// Clear all pick modes
+function clearAllPickModes() {
+  parentPickMode = false;
+  childPickMode = false;
+  spousePickMode = false;
+  selectedChildId = null;
+  selectedParentId = null;
+  selectedSpouseId = null;
+  updatePickModeIndicator();
+  try { clearSubtreeHighlight(document.getElementById('graph')); } catch (e) {}
+}
+
+// Add Person button
+document.getElementById('btnAddPerson').onclick = async () => {
+  const name = prompt('Enter person name:');
+  if (!name) return;
+  try {
+    const res = await fetch('/people', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tree_id: activeTreeId,
+        tree_version_id: activeTreeVersionId,
+        name: name,
+        notes: ''
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    await refreshPeopleDropdowns();
+    await drawGraph();
+    setStatus(`Added person: ${name}`);
+  } catch (err) {
+    console.error('Failed to add person', err);
+    setStatus('Failed to add person: ' + String(err));
+  }
+};
+
+// Add Relationship button
+document.getElementById('btnAddRelationship').onclick = () => {
+  if (!selectedChildId) {
+    alert('Please right-click a person first, then click "Add Relationship"');
+    return;
+  }
+  // Show a small menu for relationship type
+  const menu = document.createElement('div');
+  menu.style.cssText = `
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    z-index: 9999;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    padding: 8px;
+    min-width: 200px;
+  `;
+  
+  const options = [
+    { text: '➕ As CHILD', fn: () => { enterParentPick(); menu.remove(); } },
+    { text: '➕ As PARENT', fn: () => { enterChildPick(); menu.remove(); } },
+    { text: '💕 As SPOUSE', fn: () => { enterSpousePick(); menu.remove(); } }
+  ];
+  
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.textContent = opt.text;
+    btn.style.cssText = `
+      width: 100%;
+      background: transparent;
+      color: #fff;
+      border: 0;
+      padding: 10px;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 8px;
+    `;
+    btn.onmouseover = () => btn.style.background = 'rgba(255,255,255,.08)';
+    btn.onmouseout = () => btn.style.background = 'transparent';
+    btn.onclick = opt.fn;
+    menu.appendChild(btn);
+  });
+  
+  document.body.appendChild(menu);
+  setTimeout(() => {
+    if (menu.parentElement) menu.remove();
+  }, 5000);
+};
+
+// Search button
+document.getElementById('btnSearch').onclick = () => {
+  const backdrop = document.getElementById('searchModalBackdrop');
+  const modal = document.getElementById('searchModal');
+  const input = document.getElementById('searchInput');
+  backdrop.style.display = 'block';
+  modal.style.display = 'block';
+  input.value = '';
+  input.focus();
+};
+
+// Search modal close
+document.getElementById('searchModalClose').onclick = () => {
+  document.getElementById('searchModalBackdrop').style.display = 'none';
+  document.getElementById('searchModal').style.display = 'none';
+};
+
+document.getElementById('searchModalBackdrop').onclick = () => {
+  document.getElementById('searchModalBackdrop').style.display = 'none';
+  document.getElementById('searchModal').style.display = 'none';
+};
+
+// Search input handler
+document.getElementById('searchInput').oninput = async (e) => {
+  const query = e.target.value.toLowerCase().trim();
+  const resultsContainer = document.getElementById('searchResultsContainer');
+  
+  if (!query) {
+    resultsContainer.innerHTML = '<div class="no-results">Start typing to search...</div>';
+    return;
+  }
+  
+  if (!activeTreeId) {
+    resultsContainer.innerHTML = '<div class="no-results">No tree loaded. Please select a tree first.</div>';
+    return;
+  }
+  
+  try {
+    let url = '/people?';
+    const params = [];
+    if (activeTreeId) params.push(`tree_id=${encodeURIComponent(activeTreeId)}`);
+    if (activeTreeVersionId) params.push(`tree_version_id=${encodeURIComponent(activeTreeVersionId)}`);
+    url += params.join('&');
+    
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const people = await res.json();
+    
+    const matches = people.filter(p => 
+      p.display_name && p.display_name.toLowerCase().includes(query)
+    ).slice(0, 20);
+    
+    if (matches.length === 0) {
+      resultsContainer.innerHTML = '<div class="no-results">No people found</div>';
+      return;
+    }
+    
+    resultsContainer.innerHTML = matches.map(p => `
+      <div class="search-result-item" data-person-id="${escapeHtml(p.id)}">
+        <div class="search-result-name">${escapeHtml(p.display_name)}</div>
+        <div class="search-result-meta">${p.notes ? escapeHtml(p.notes.substring(0, 40)) : 'No notes'}</div>
+      </div>
+    `).join('');
+    
+    // Add click handlers to search results
+    resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
+      item.onclick = () => {
+        const personId = item.getAttribute('data-person-id');
+        if (personId) selectPersonFromSearch(personId);
+      };
+    });
+  } catch (err) {
+    console.error('Search error:', err);
+    resultsContainer.innerHTML = `<div class="no-results">Error: ${String(err).substring(0, 100)}</div>`;
+  }
+};
+
+// Select person from search
+function selectPersonFromSearch(personId) {
+  try {
+    // Close modal
+    document.getElementById('searchModalBackdrop').style.display = 'none';
+    document.getElementById('searchModal').style.display = 'none';
+    
+    // Clear search input and results for next search
+    const searchInput = document.getElementById('searchInput');
+    const resultsContainer = document.getElementById('searchResultsContainer');
+    if (searchInput) searchInput.value = '';
+    if (resultsContainer) resultsContainer.innerHTML = '';
+    
+    // Get graph element
+    const gd = document.getElementById('graph');
+    if (!gd) {
+      console.error('Graph element not found');
+      return;
+    }
+    
+    if (!gd.data || gd.data.length < 2) {
+      console.error('Graph data not available');
+      setStatus('Graph data not ready');
+      return;
+    }
+    
+    // Clear any previous selection highlights
+    try {
+      clearSelectionHighlights(gd);
+    } catch (e) {
+      console.warn('Could not clear previous highlights:', e);
+    }
+    
+    // Find node trace (markers)
+    const data = gd.data || [];
+    const nodeIdx = data.findIndex((t) => (t.mode||"").includes('markers'));
+    if (nodeIdx < 0) {
+      console.error('Node trace not found');
+      setStatus('Could not locate nodes in graph');
+      return;
+    }
+    
+    const nodeTrace = data[nodeIdx];
+    if (!nodeTrace || !nodeTrace.customdata) {
+      console.warn('Node trace data not available');
+      setStatus('Could not locate person in graph');
+      return;
+    }
+    
+    // Find the person in the graph
+    const idx = nodeTrace.customdata.findIndex(cd => cd && cd.person_id === personId);
+    if (idx < 0) {
+      console.warn(`Person ${personId} not found in graph`);
+      setStatus(`Person not found in current view`);
+      return;
+    }
+    
+    // Get current marker properties
+    const nodeCount = nodeTrace.customdata.length;
+    const baseColors = Array.isArray(nodeTrace.marker.color) 
+      ? nodeTrace.marker.color.slice() 
+      : new Array(nodeCount).fill(nodeTrace.marker.color || '#888');
+    const baseLineColors = (nodeTrace.marker.line && Array.isArray(nodeTrace.marker.line.color))
+      ? nodeTrace.marker.line.color.slice()
+      : new Array(nodeCount).fill((nodeTrace.marker.line && nodeTrace.marker.line.color) || '#333');
+    const baseLineWidths = (nodeTrace.marker.line && Array.isArray(nodeTrace.marker.line.width))
+      ? nodeTrace.marker.line.width.slice()
+      : new Array(nodeCount).fill((nodeTrace.marker.line && nodeTrace.marker.line.width) || 1);
+    const baseSizes = Array.isArray(nodeTrace.marker.size)
+      ? nodeTrace.marker.size.slice()
+      : new Array(nodeCount).fill(nodeTrace.marker.size || 10);
+    
+    // Highlight selected node with bright gold color and thick red border
+    baseColors[idx] = '#FFD700'; // Gold
+    baseLineColors[idx] = '#FF4500'; // Orange-red border
+    baseLineWidths[idx] = 5; // Thick border
+    baseSizes[idx] = baseSizes[idx] * 2.5; // Much larger
+    
+    // Apply highlighting
+    Plotly.restyle(gd, {
+      'marker.color': [baseColors],
+      'marker.line.color': [baseLineColors],
+      'marker.line.width': [baseLineWidths],
+      'marker.size': [baseSizes]
+    }, [nodeIdx]);
+    
+    const personName = nodeTrace.customdata[idx].label || nodeTrace.text?.[idx] || `Person #${personId}`;
+    setStatus(`Selected: ${personName}`);
+  } catch (err) {
+    console.error('Error selecting person:', err);
+    setStatus(`Error selecting person: ${String(err).substring(0, 50)}`);
+  }
+}
+
+// Help button
+document.getElementById('btnHelp').onclick = () => {
+  alert(`Family Tree Keyboard Shortcuts & Tips:
+
+TOOLBAR BUTTONS:
+• Add Person: Create a new person
+• Relationship: (after right-clicking) link people together
+• Search: Find a person by name
+
+KEYBOARD SHORTCUTS:
+• Ctrl+N: New person
+• Ctrl+F: Search
+• Esc: Cancel current operation
+
+RIGHT-CLICK MENU:
+• Right-click any person to see options
+• Edit, add relationships, or delete
+
+RELATIONSHIPS:
+Right-click → "Add [Type] relationship" → Click target person
+
+Tips:
+• Drag the graph to pan
+• Scroll to zoom
+• Hover over nodes to see details
+• Try importing a family tree file (left panel)
+  `);
+};
+
+// Helper to escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function loadSelectedTreeVersion() {
+  if (!activeTreeId) return;
+  const res = await fetch(`/trees/${activeTreeId}/versions`);
+  if (!res.ok) throw new Error(await res.text());
+  const versions = await res.json();
+  // find active version
+  const active = versions.find(v => v.active) || versions[versions.length-1];
+  activeTreeVersionId = active ? active.id : null;
+}
+
 (async function init() {
   await refreshPeopleDropdowns();
   await loadTrees();
   await refreshDraftsCount();
   await drawGraph();
+  updatePickModeIndicator();
+  
+  // Listen for Escape key to clear pick modes
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      clearAllPickModes();
+    }
+  });
 })();

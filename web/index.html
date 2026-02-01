@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Family Tree</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>">
 
   <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <script defer src="/web/app.js"></script>
@@ -267,6 +268,157 @@
     .modal-btn.primary{
       border-color: #555;
     }
+
+    /* TOOLBAR STYLES */
+    #toolbar {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9998;
+      display: flex;
+      gap: 8px;
+      background: #111;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #333;
+      box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    }
+
+    #toolbar button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      color: #fff;
+      border: 1px solid #333;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font: 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    #toolbar button:hover {
+      background: rgba(255,255,255,.08);
+      border-color: #555;
+    }
+
+    #toolbar button:active {
+      background: rgba(255,255,255,.12);
+    }
+
+    #toolbar button.icon-only {
+      padding: 8px 10px;
+    }
+
+    /* Toolbar icon styling */
+    #toolbar button .icon {
+      font-size: 14px;
+      display: inline-block;
+    }
+
+    /* Search results dropdown */
+    #searchResultsDropdown {
+      position: fixed;
+      top: 50px;
+      right: 12px;
+      z-index: 9998;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.25);
+      max-width: 320px;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    #searchResultsDropdown .result-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #1a1a1a;
+      color: #fff;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+
+    #searchResultsDropdown .result-item:hover {
+      background: rgba(255,255,255,.08);
+    }
+
+    #searchResultsDropdown .result-item:last-child {
+      border-bottom: none;
+    }
+
+    #searchResultsDropdown .result-name {
+      font-weight: 500;
+    }
+
+    #searchResultsDropdown .result-meta {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    #searchResultsDropdown .no-results {
+      padding: 12px;
+      text-align: center;
+      color: #999;
+      font-size: 12px;
+    }
+
+    /* Pick mode indicator in toolbar */
+    #toolbar .pick-mode-indicator {
+      padding: 8px 12px;
+      background: rgba(74, 158, 255, 0.15);
+      border: 1px solid rgba(74, 158, 255, 0.4);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #4a9eff;
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #toolbar .pick-mode-indicator.active {
+      display: flex;
+    }
+
+    /* SEARCH MODAL */
+    #searchModal .modal-input {
+      margin-bottom: 10px;
+    }
+
+    #searchModal .search-results {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    #searchModal .search-result-item {
+      padding: 10px;
+      margin-bottom: 6px;
+      background: rgba(255,255,255,.02);
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+
+    #searchModal .search-result-item:hover {
+      background: rgba(255,255,255,.08);
+      border-color: #333;
+    }
+
+    #searchModal .search-result-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    #searchModal .search-result-meta {
+      font-size: 11px;
+      opacity: 0.7;
+    }
         
   </style>
 </head>
@@ -325,6 +477,34 @@
     </div>
   </div>
 
+  <!-- TOOLBAR -->
+  <div id="toolbar">
+    <button id="btnAddPerson" title="Add a new person (Ctrl+N)">
+      <span class="icon">➕</span>
+      <span>Add Person</span>
+    </button>
+    <button id="btnAddRelationship" title="Create a relationship (Ctrl+R)">
+      <span class="icon">🔗</span>
+      <span>Relationship</span>
+    </button>
+    <button id="btnSearch" title="Search people (Ctrl+F)">
+      <span class="icon">🔍</span>
+      <span>Search</span>
+    </button>
+    <button id="btnHelp" class="icon-only" title="Help & shortcuts">
+      <span class="icon">❓</span>
+    </button>
+    <div class="pick-mode-indicator" id="pickModeIndicator">
+      <span id="pickModeText">Picking...</span>
+      <button style="padding:0;border:0;background:transparent;color:inherit;cursor:pointer;" onclick="clearAllPickModes()">✕</button>
+    </div>
+  </div>
+
+  <!-- SEARCH RESULTS DROPDOWN -->
+  <div id="searchResultsDropdown">
+    <div id="searchResultsList"></div>
+  </div>
+
   <!-- CONTEXT MENU -->
   <div id="ctxMenu">
     <div class="hint" id="ctxHint">Right-click menu</div>
@@ -358,6 +538,18 @@
     <div class="modal-actions">
       <button id="personModalCancel" class="modal-btn">Cancel</button>
       <button id="personModalSave" class="modal-btn primary">Save</button>
+    </div>
+  </div>
+
+  <!-- SEARCH MODAL -->
+  <div id="searchModalBackdrop" class="modal-backdrop" style="display:none;"></div>
+
+  <div id="searchModal" class="modal" style="display:none;">
+    <div class="modal-title">Search People</div>
+    <input id="searchInput" class="modal-input" placeholder="Enter name to search..." autofocus />
+    <div class="search-results" id="searchResultsContainer"></div>
+    <div class="modal-actions">
+      <button id="searchModalClose" class="modal-btn">Close</button>
     </div>
   </div>
 
