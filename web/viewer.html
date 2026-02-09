@@ -256,8 +256,21 @@
         const color = GEN_COLORS[gen % GEN_COLORS.length];
         elements.push({ data: { id: n.data.id, label: n.data.label, gen, color } });
       });
+      // Deduplicate parent edges for married couples
+      const spouseOf = {};
       data.edges.forEach(e => {
-        elements.push({ data: { id: e.data.id, source: e.data.source, target: e.data.target, type: e.data.type } });
+        if (e.data.type === 'SPOUSE_OF') { spouseOf[e.data.source] = e.data.target; spouseOf[e.data.target] = e.data.source; }
+      });
+      const parentEdges = data.edges.filter(e => e.data.type === 'PARENT_OF');
+      const skipEdges = new Set();
+      const childParents = {};
+      parentEdges.forEach(e => { const c = e.data.target; if (!childParents[c]) childParents[c] = []; childParents[c].push(e); });
+      for (const child in childParents) {
+        const edges = childParents[child];
+        if (edges.length === 2 && spouseOf[edges[0].data.source] === edges[1].data.source) skipEdges.add(edges[1].data.id);
+      }
+      data.edges.forEach(e => {
+        if (!skipEdges.has(e.data.id)) elements.push({ data: { id: e.data.id, source: e.data.source, target: e.data.target, type: e.data.type } });
       });
 
       cy = cytoscape({

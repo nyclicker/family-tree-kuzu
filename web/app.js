@@ -1340,10 +1340,42 @@ async function loadGraph() {
     elements.push({ data: { id: n.data.id, label: n.data.label, gen, color } });
   });
 
+  // Build spouse lookup to detect married couples
+  const spouseOf = {};
   data.edges.forEach(e => {
-    elements.push({
-      data: { id: e.data.id, source: e.data.source, target: e.data.target, type: e.data.type }
-    });
+    if (e.data.type === 'SPOUSE_OF') {
+      spouseOf[e.data.source] = e.data.target;
+      spouseOf[e.data.target] = e.data.source;
+    }
+  });
+
+  // For children with two married parents, only show one PARENT_OF edge
+  const parentEdges = data.edges.filter(e => e.data.type === 'PARENT_OF');
+  const skipEdges = new Set();
+  const childParents = {};
+  parentEdges.forEach(e => {
+    const child = e.data.target;
+    if (!childParents[child]) childParents[child] = [];
+    childParents[child].push(e);
+  });
+  for (const child in childParents) {
+    const edges = childParents[child];
+    if (edges.length === 2) {
+      const p1 = edges[0].data.source, p2 = edges[1].data.source;
+      if (spouseOf[p1] === p2) {
+        // Skip the edge from the spouse who is NOT the primary tree parent
+        // Keep the edge from whichever parent has more connections in the tree
+        skipEdges.add(edges[1].data.id);
+      }
+    }
+  }
+
+  data.edges.forEach(e => {
+    if (!skipEdges.has(e.data.id)) {
+      elements.push({
+        data: { id: e.data.id, source: e.data.source, target: e.data.target, type: e.data.type }
+      });
+    }
   });
 
   if (cy) cy.destroy();
