@@ -17,6 +17,11 @@ class RelCreate(BaseModel):
     to_person_id: str
     type: Literal["PARENT_OF","SPOUSE_OF","SIBLING_OF"]
 
+class PersonUpdate(BaseModel):
+    display_name: str
+    sex: Literal["M","F","U"] = "U"
+    notes: Optional[str] = None
+
 class GraphOut(BaseModel):
     nodes: list[dict]
     edges: list[dict]

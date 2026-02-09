@@ -1,0 +1,266 @@
+Person 1,Relation,Person 2,Gender,Details
+Weldeamlak\n(Geza),Earliest Ancestor,,M,Highlight
+Berhane,Child,Weldeamlak\n(Geza),M
+Gebremeskel WA,Child,Weldeamlak\n(Geza),M
+Misiel,Child,Berhane,M
+Aynalem,Child,Misiel,M
+Fisha,Child,Misiel,M
+Weldehans,Child,Misiel,M
+Zeru TB,Child,Gebremeskel WA,M,
+Habte,Child,Gebremeskel WA,M,
+Tekle GM,Child,Gebremeskel WA,M,
+Weldegiorghis,Child,Gebremeskel WA,M,
+Tesfagiorghis,Child,Zeru TB,M
+Beyn,Child,Zeru TB,M
+Kifle,Child,Zeru TB,M
+Ablelom,Child,Zeru TB,M
+Teweldeberhan,Child,Zeru TB,M
+Weldeamlak\n(Bashay),Child,Weldegiorghis,M,
+#LeteSelase,Spouse,Weldeamlak\n(Bashay),F,Grandma
+Desta,Child,Weldegiorghis,F,
+Gebriel,Child,Weldegiorghis,M,
+Gebrenegus,Child,Weldegiorghis,M,
+Haile WG,Child,Weldegiorghis,M,
+Gebreyesus WG,Child,Weldegiorghis,M,
+Semaetu,Child,Weldegiorghis,M,
+Gebremichael,Child,Weldegiorghis,M,
+Abraham,Child,Habte,M,
+Naizgi,Child,Habte,M,
+Embaye Tekle,Child,Tekle GM,M,
+Araya T,Child,Tekle GM,M,
+Gebreselassie,Child,Tekle GM,M,
+Kidane Tekle,Child,Tekle GM,M,
+Ogbaldet I,Child,Abraham,M
+Ogbazghi,Child,Abraham,M,
+Tesfagabir I,Child,Abraham,M,
+Mehari,Child,Naizgi,M
+Nigisti Naizgi,Child,Naizgi,F
+Leterfiel WA,Child,Weldeamlak\n(Bashay),F
+Kidusan,Child,Weldeamlak\n(Bashay),F
+Fisihatsion,Child,Weldeamlak\n(Bashay),M
+Debretsion,Child,Weldeamlak\n(Bashay),M
+Hansu WA,Child,Weldeamlak\n(Bashay),F
+Ogbatsion,Child,Weldeamlak\n(Bashay),M
+Nebiat WA,Child,Weldeamlak\n(Bashay),F
+Tuccu,Child,Weldeamlak\n(Bashay),M
+Teklu,Child,Weldeamlak\n(Bashay),M
+Sebene,Child,Weldeamlak\n(Bashay),F
+# Desta family tree provided by Tesfagbr Ghile
+Kahsai (Desta),Child,Desta,M
+Letebrhan,Child,Desta,F
+Kudusan (Desta),Child,Desta,F
+Kidisti (Desta),Child,Desta,F
+Ghile,Child,Desta,M
+Embaye Kahsai,Child,Kahsai (Desta),M
+Weini Kahsai,Child,Kahsai (Desta),F
+Haddas,Child,Kahsai (Desta),F
+Hayle,Child,Kahsai (Desta),M
+Tadelesh,Child,Kahsai (Desta),F
+Tesfay K,Child,Kahsai (Desta),M
+Alazar K,Child,Kahsai (Desta),M
+Kudusan K,Child,Kahsai (Desta),F
+Mahlet\n(Letebrhan),Child,Letebrhan,F
+Ghideay\n(Letebrhan),Child,Letebrhan,F
+Ghebremichael\n(Kudusan),Child,Kudusan (Desta),M
+Letenegus\n(Kudusan),Child,Kudusan (Desta),F
+Ghirmay\n(Kidisti),Child,Kidisti (Desta),M
+Roma\n(Kidisti),Child,Kidisti (Desta),F
+Tekie\n(Kidisti),Child,Kidisti (Desta),M
+Bereket\n(Kidisti),Child,Kidisti (Desta),M
+Kidane\n(Kidisti),Child,Kidisti (Desta),M
+Brhane\n(Kidisti),Child,Kidisti (Desta),M
+Fuzum\n(Kidisti),Child,Kidisti (Desta),M
+Tesfamariam G,Child,Ghile,M
+Kidan,Child,Ghile,F
+Habtom,Child,Ghile,M
+Tesfagabr,Child,Ghile,M
+Mehari,Child,Ghile,M
+Tesfaldet,Child,Ghile,M
+Almaz G,Child,Ghile,F
+Hanibal,Child,Tesfamariam G,M
+Meron,Child,Tesfamariam G,M
+Eden\n(Kidan),Child,Kidan,F
+Henok\n(Kidan),Child,Kidan,M
+Betiel\n(Kidan),Child,Kidan,F
+Hermon\n(Kidan),Child,Kidan,M
+Jonathan\n(Tesfagabr),Child,Tesfagabr,M
+Sarah\n(Tesfagabr),Child,Tesfagabr,F
+Joseph\n(Tesfagabr),Child,Tesfagabr,M
+Habtom\n(Tesfaldet),Child,Tesfaldet,M
+Feven\n(Tesfaldet),Child,Tesfaldet,F
+Robel\n(Tesfaldet),Child,Tesfaldet,M
+Adam\n(Tesfaldet),Child,Tesfaldet,M
+Amanuel\n(Almaz),Child,Almaz G,M
+Bana\n(Almaz),Child,Almaz G,F
+Dina\n(Almaz),Child,Almaz G,F
+Abel\n(Almaz),Child,Almaz G,M
+Yeol\n(Almaz),Child,Almaz G,M
+Yonas\n(Almaz),Child,Almaz G,M
+# End of Desta Family Tree
+Tsegay,Child,Gebriel,M
+Nigisti Gebriel,Child,Gebriel,F
+Tesfazgi,Child,Gebrenegus,M
+Semere,Child,Gebrenegus,M
+Siyum,Child,Haile WG,M
+Semere II,Child,Haile WG,M
+Keshi Gebreab,Child,Haile WG,M
+Tekle Haile,Child,Haile WG,M
+Dehab GY,Child,Gebreyesus WG,F
+Keshi Dagnew,Child,Semaetu,M
+Mesfin GM,Child,Gebremichael,M
+Afewerki,Child,Gebremichael,M
+Tsedal,Child,Gebremichael,F
+Abrehet GM,Child,Gebremichael,F
+Gebrehiwet,Child,Leterfiel WA,M
+Iyasu,Child,Leterfiel WA,M
+Gerezgiher,Child,Leterfiel WA,M
+Tsigereda,Child,Leterfiel WA,F
+Abeba F,Child,Fisihatsion,F
+Gerezgiher II,Child,Fisihatsion,M
+Beraki,Child,Fisihatsion,M
+Ethiopia,Child,Fisihatsion,F
+Saba F,Child,Fisihatsion,F
+Isayas,Child,Fisihatsion,M
+Maaza,Child,Fisihatsion,F
+Daniel F,Child,Fisihatsion,M
+Liya,Child,Fisihatsion,F
+Berhane II,Child,Fisihatsion,M
+Mussie F,Child,Fisihatsion,M
+Teklehaimanot,Child,Debretsion,M
+Letenegus,Child,Debretsion,F
+Himan,Child,Debretsion,F
+Weini,Child,Debretsion,F
+Genet D,Child,Debretsion,F
+Zemuy,Child,Debretsion,M
+Gebreyesus,Child,Debretsion,M
+Kidisti,Child,Debretsion,F
+Zeratsion,Child,Debretsion,M
+Abrahaley,Child,Hansu WA,M
+Elsa,Child,Hansu WA,F
+Biniam O,Child,Ogbatsion,M
+Efrem,Child,Ogbatsion,M
+Almaz T,Child,Teklu,F
+Aster,Child,Teklu,F
+Liya II,Child,Teklu,F
+Ambasajer,Child,Teklu,M
+Sirak,Child,Teklu,M
+Semhar T,Child,Teklu,F
+Saba\nTeklu,Child,Teklu,F
+Zenawi,Child,Teklu,M
+Ruta\nTeklu,Child,Teklu,F
+Rahel\nTeklu,Child,Teklu,F
+Aklilu,Child,Tuccu,M,Me
+Solomon T,Child,Tuccu,M
+Selamawit T,Child,Tuccu,F
+Tesfamariam,Child,Sebene,M
+Fesahaye,Child,Kidusan,M
+Ablelom II,Child,Kidusan,M
+Roma\n(Dehab),Child,Dehab GY,F
+Asghedet,Child,Dehab GY,F
+Tsahaitu\n(Dehab),Child,Dehab GY,F
+Lulia,Child,Aklilu,F
+Natalia,Child,Aklilu,F 
+Sophie,Child,Solomon T,F
+Simona,Child,Solomon T,F
+Elnathan,Child,Selamawit T,M
+Sesina,Child,Selamawit T,F
+Hannah,Child,Zeratsion,F
+# Source for next list is Solomon Gebremeskel TG
+Gebremeskel TG,Child,Tesfagiorghis,M
+Teweldemedhin,Child,Tesfagiorghis,M
+Negeset,Child,Tesfagiorghis,F
+Tsigheweini,Child,Tesfagiorghis,F
+Gebremedhin,Child,Tesfagiorghis,M
+Andemeskel,Child,Tesfagiorghis,M
+Gebretinsae,Child,Tesfagiorghis,M
+Berhe,Child,Beyn,M
+Zaid B,Child,Beyn,F
+Hailemariam,Child,Beyn,M
+EmunaTsion,Child,Beyn,F
+Mebrat B,Child,Beyn,F
+Tesfaghebriel,Child,Beyn,M
+Abrahatsion B,Child,Beyn,F
+Teklemichael,Child,Gebremeskel TG,M
+Genet GM,Child,Gebremeskel TG,F,deceased
+Solomon GM,Child,Gebremeskel TG,M
+Hadas GM,Child,Gebremeskel TG,F
+Tirhas,Child,Gebremeskel TG,F
+Eyob,Child,Gebremeskel TG,M,deceased
+Damaris,Child,Solomon GM,F
+Felegh,Child,Solomon GM,F
+Selam S,Child,Solomon GM,F
+Yohanna,Child,Teklemichael,F
+Abel TM,Child,Teklemichael,M
+Asmerom,Child,Hadas GM,M
+Rahwa,Child,Hadas GM,F
+Haben\n(Hadas),Child,Hadas GM,M
+Robel\n(Tirhas),Child,Tirhas,M
+Saba\n(Tirhas),Child,Tirhas,F
+Helen\n(Tirhas),Child,Tirhas,F
+Senait\n(Tirhas),Child,Tirhas,F
+Letensae,Child,Berhe,F
+Zeru B,Child,Berhe,M,deceased
+Habtom B,Child,Berhe,M,deceased
+Kidane B,Child,Berhe,M,deceased
+Yodit B,Child,Berhe,F
+Rebecca\n(Letensae),Child,Letensae,F
+Biruk,Child,Yodit B,M
+Bisrat,Child,Yodit B,M
+John,Child,Yodit B,M
+Delina,Child,Damaris,F
+Jeremiah,Child,Damaris,M
+Keshi Mehari,Child,Gebrehiwet,M
+Rigbe,Child,Gebrehiwet,F
+Werku,Child,Gebrehiwet,F
+Daniel GH,Child,Gebrehiwet,M
+Mengisteab,Child,Gebrehiwet,M
+Genet GH,Child,Gebrehiwet,F
+Yemane Iyasu,Child,Iyasu,M
+Senait Iyasu,Child,Iyasu,F
+Yonas\n(Tsigereda),Child,Tsigereda,M
+Lemlem\n(Tsigereda),Child,Tsigereda,F
+Himan\n(Tsigereda),Child,Tsigereda,F
+Winta,Child,Tsigereda,F
+Tirhas,Child,Tsigereda,F
+Mebrahutu,Child,Tsigereda,M
+Semhar\n(Tsigereda),Child,Tsigereda,F
+Selam\n(Tsigereda),Child,Tsigereda,F
+Zerie,Child,Gerezgiher,M
+Bana,Child,Gerezgiher,F
+Awet G,Child,Gerezgiher,F
+Senait TH,Child,Teklehaimanot,F
+Thomas,Child,Teklehaimanot,M
+Selam TH,Child,Teklehaimanot,F
+Yonas TH,Child,Teklehaimanot,M
+Bethlehem,Child,Teklehaimanot,F
+Senait\n(Letenegus),Child,Letenegus,F
+Lemlem\n(Letenegus),Child,Letenegus,F
+Helen\n(Letenegus),Child,Letenegus,F
+Michael\n(Letenegus),Child,Letenegus,M
+Measho,Child,Letenegus,M
+Yodit\n(Letenegus),Child,Letenegus,F
+Letekidan,Child,Weini,F
+Teberh,Child,Weini,F
+Senait\n(Weini),Child,Weini,F
+Haileab,Child,Weini,M
+Ariam,Child,Weini,F
+Yohannes\n(Biniam),Child,Biniam O,M
+Daniel Abrahaley,Child,Abrahaley,M
+Martha,Child,Abrahaley,F
+Sara Abrahaley,Child,Abrahaley,F
+Bisrat Abrahaley,Child,Abrahaley,F
+Finan,Child,Abrahaley,F
+Elnathan\n(Daniel),Child,Daniel Abrahaley,M
+Sinnit,Child,Daniel Abrahaley,F
+Simon Daniel,Child,Daniel Abrahaley,M
+Shalom,Child,Daniel Abrahaley,M
+Bana\n(Sara),Child,Sara Abrahaley,F
+Rahsi,Child,Sara Abrahaley,F
+Tesfalem,Child,Elsa,M
+Yohannes\n(Elsa),Child,Elsa,M
+Azieb\n(Elsa),Child,Elsa,F
+Gidey\n(Elsa),Child,Elsa,F
+Tesfamariam\n(Elsa),Child,Elsa,M
+Michael\n(Elsa),Child,Elsa,M
+Bereket\n(Elsa),Child,Elsa,M
+Yohanna\n(Elsa),Child,Elsa,F

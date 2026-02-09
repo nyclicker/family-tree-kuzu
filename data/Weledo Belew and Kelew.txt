@@ -1,0 +1,53 @@
+Person 1,Relation,Person 2,Gender,Details
+Belew,Earliest Ancestor,,M,Highlight
+#Kelew,Sibling,Belew,M
+Gebreselasse,Child,Belew,M
+Yosief GS,Child,Gebreselasse,M
+Awray,Child,Yosief GS,M
+Mohammed Habeshay,Child,Awray,M
+Himed Kinue,Child,Mohammed Habeshay,M
+Mohammed Din,Child,Himed Kinue,M
+Mohammed Melatsi,Child,Mohammed Din,M
+Naib,Child,Mohammed Melatsi,M
+Mohammed Tsaeda\n(Dirar),Child,Naib,M
+Mohammed Mekae,Child,Naib,M
+Hamid Hibishtey,Child,Naib,M
+Haftom Shimedin,Child,Naib,M
+Hawentay,Child,Mohammed Tsaeda\n(Dirar),M
+Akoray,Child,Mohammed Tsaeda\n(Dirar),M
+Mogonay,Child,Mohammed Tsaeda\n(Dirar),M
+Lihenay,Child,Hawentay,M
+Hatsinay,Child,Hawentay,M
+Hayentay,Child,Lihenay,M
+Melokusie,Child,Lihenay,M
+Shelenay,Child,Lihenay,M
+Guedad,Child,Lihenay,M
+Keflit,Child,Hayentay,M
+Girhamy Keflit,Child,Keflit,M
+Jenagebriel,Child,Girhamy Keflit,M
+Debretsion J,Child,Jenagebriel,M
+Bigidi,Child,Debretsion J,M
+Adi,Child,Debretsion J,M
+Firehiwet,Child,Debretsion J,M
+Habtom,Child,Debretsion J,M
+Mertebay,Child,Bigidi,M
+Hidretsion,Child,Mertebay,M
+Gulay,Child,Hidretsion,M
+Betremariam,Child,Gulay,M
+Weldesewit,Child,Betremariam,M
+Weldehaimanot,Child,Betremariam,M
+Medhanie,Child,Betremariam,M
+Letenebiat,Child,Betremariam,F
+Weldeselasse,Child,Medhanie,M
+Tesfa,Child,Weldeselasse,M
+Gebrekal,Child,Tesfa,M
+Kahsai\n(Kasa),Child,Gebrekal,M
+Tedla,Child,Kahsai\n(Kasa),M
+Lemlem,Child,Kahsai\n(Kasa),F
+Abrehet,Child,Lemlem,F
+Kidan,Child,Lemlem,F
+Hagosa,Child,Lemlem,F
+Gerghis,Child,Tedla,F
+Berhane T,Child,Tedla,M
+Tesfay Tedla,Child,Tedla,M
+Letay,Child,Tedla,F

@@ -1,1 +1,345 @@
-<html><body><h1>Family Tree</h1><div id='cy'></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Tree</title>
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+  <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #2c3e50; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 22px; font-weight: 600; }
+    .container { display: flex; height: calc(100vh - 56px); }
+    .sidebar { width: 320px; min-width: 320px; background: white; border-right: 1px solid #ddd; overflow-y: auto; padding: 20px; }
+    .sidebar h2 { font-size: 15px; color: #2c3e50; margin-bottom: 12px; border-bottom: 2px solid #3498db; padding-bottom: 6px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+    }
+    .form-group textarea { resize: vertical; height: 50px; }
+    button {
+      padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;
+      font-size: 13px; font-weight: 600; transition: background 0.2s;
+    }
+    .btn-primary { background: #3498db; color: white; }
+    .btn-primary:hover { background: #2980b9; }
+    .btn-success { background: #27ae60; color: white; }
+    .btn-success:hover { background: #219a52; }
+    .btn-danger { background: #e74c3c; color: white; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    #cy { flex: 1; background: #fafafa; position: relative; }
+    .section { margin-bottom: 24px; }
+    .person-list { list-style: none; max-height: 300px; overflow-y: auto; }
+    .person-list li {
+      padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #eee;
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .person-list li:hover { background: #f0f7ff; }
+    .person-list li.active { background: #ebf5fb; border-left: 3px solid #3498db; }
+    .person-list li .match-highlight { background: #fff3cd; border-radius: 2px; padding: 0 1px; }
+    .search-count { font-size: 11px; color: #999; margin-bottom: 6px; }
+    .sex-badge {
+      display: inline-block; width: 20px; height: 20px; border-radius: 50%;
+      text-align: center; line-height: 20px; font-size: 11px; font-weight: bold; color: white;
+      background: #95a5a6;
+    }
+    .status { padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-top: 8px; display: none; }
+    .status.success { display: block; background: #d4edda; color: #155724; }
+    .status.error { display: block; background: #f8d7da; color: #721c24; }
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; color: #999; font-size: 16px; text-align: center; padding: 40px;
+    }
+    .empty-state p { margin-top: 12px; font-size: 13px; color: #bbb; }
+    .legend { display: flex; gap: 16px; font-size: 12px; }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+    /* Context Menu */
+    .ctx-menu {
+      display: none; position: fixed; z-index: 1000;
+      background: white; border: 1px solid #ddd; border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15); min-width: 180px;
+      padding: 4px 0; font-size: 13px;
+    }
+    .ctx-menu.open { display: block; }
+    .ctx-item {
+      padding: 8px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      color: #333; transition: background 0.1s;
+    }
+    .ctx-item:hover { background: #f0f7ff; }
+    .ctx-item.danger { color: #e74c3c; }
+    .ctx-item.danger:hover { background: #fdf0ef; }
+    .ctx-sep { height: 1px; background: #eee; margin: 4px 0; }
+    .ctx-icon { width: 16px; text-align: center; font-size: 14px; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; z-index: 2000; inset: 0;
+      background: rgba(0,0,0,0.4); align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 8px; padding: 24px; width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .modal h3 { margin-bottom: 16px; font-size: 17px; color: #2c3e50; }
+    .modal .form-group { margin-bottom: 14px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+    .btn-secondary { background: #ecf0f1; color: #333; }
+    .btn-secondary:hover { background: #dfe6e9; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #ccc; border-radius: 6px; padding: 16px;
+      text-align: center; cursor: pointer; color: #999; font-size: 13px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #3498db; background: #f0f7ff; color: #3498db;
+    }
+
+    /* Import report */
+    .import-summary { font-size: 13px; padding: 8px 0; color: #555; }
+    .import-summary strong { color: #2c3e50; }
+    .report-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; color: #27ae60;
+      margin: 8px 0 4px; letter-spacing: 0.5px;
+    }
+    .report-label.errors { color: #e74c3c; }
+    .report-list {
+      list-style: none; max-height: 150px; overflow-y: auto;
+      font-size: 12px; background: #f9f9f9; border-radius: 4px; padding: 4px 0;
+    }
+    .report-list li { padding: 4px 10px; border-bottom: 1px solid #eee; color: #555; }
+    .report-list.errors li { color: #c0392b; }
+    .report-list li:last-child { border-bottom: none; }
+    .report-list li .line-num { color: #999; font-size: 11px; margin-right: 4px; }
+
+    /* Reset layout button */
+    .reset-btn {
+      position: absolute; top: 10px; right: 10px; z-index: 10;
+      padding: 6px 14px; font-size: 12px; font-weight: 600;
+      background: white; color: #555; border: 1px solid #ccc; border-radius: 4px;
+      cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      transition: background 0.15s;
+    }
+    .reset-btn:hover { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Family Tree</h1>
+    <div class="legend">
+      <span id="datasetLabel" style="font-weight:600; margin-right:16px"></span>
+      <span style="font-size:11px; color:#aaa">
+        Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse &nbsp; Dotted = Sibling
+      </span>
+    </div>
+  </header>
+  <div class="container">
+    <div class="sidebar">
+      <!-- Dataset -->
+      <div class="section">
+        <h2>Dataset</h2>
+        <div id="datasetInfo" style="font-size:14px;font-weight:600;color:#2c3e50;margin-bottom:10px">No data loaded</div>
+        <div class="form-group">
+          <label>Load File (.csv, .txt, .db)</label>
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <span id="dropLabel">Click or drag a file here</span>
+            <input type="file" id="fileInput" accept=".csv,.txt,.db" style="display:none" onchange="onFileSelected(this)">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:6px">
+          <button class="btn-success" id="saveBtn" onclick="saveChanges()" style="display:none">Save Changes (CSV)</button>
+        </div>
+        <div id="loadStatus" class="status"></div>
+      </div>
+
+      <!-- Import Report -->
+      <div class="section" id="importReportSection" style="display:none">
+        <h2>Import Report</h2>
+        <div id="importSummary" class="import-summary"></div>
+        <div id="importFixes" style="display:none">
+          <div class="report-label">Auto-fixed</div>
+          <ul id="fixesList" class="report-list"></ul>
+        </div>
+        <div id="importErrors" style="display:none">
+          <div class="report-label errors">Needs Attention</div>
+          <ul id="errorsList" class="report-list errors"></ul>
+        </div>
+      </div>
+
+      <!-- Add Person -->
+      <div class="section">
+        <h2>Add Person</h2>
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="personName" placeholder="e.g. John Smith">
+        </div>
+        <div class="form-group">
+          <label>Sex</label>
+          <select id="personSex">
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="U">Unknown</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="personNotes" placeholder="Optional notes..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="addPerson()">Add Person</button>
+        <div id="personStatus" class="status"></div>
+      </div>
+
+      <!-- Add Relationship -->
+      <div class="section">
+        <h2>Add Relationship</h2>
+        <div class="form-group">
+          <label>From Person</label>
+          <select id="relFrom"></select>
+        </div>
+        <div class="form-group">
+          <label>Relationship</label>
+          <select id="relType">
+            <option value="PARENT_OF">Parent of</option>
+            <option value="SPOUSE_OF">Spouse of</option>
+            <option value="SIBLING_OF">Sibling of</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>To Person</label>
+          <select id="relTo"></select>
+        </div>
+        <button class="btn-success" onclick="addRelationship()">Add Relationship</button>
+        <div id="relStatus" class="status"></div>
+      </div>
+
+      <!-- Search & People List -->
+      <div class="section">
+        <h2>Search People</h2>
+        <div class="form-group" style="margin-bottom:8px">
+          <input type="text" id="searchInput" placeholder="Type a name to search..." oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+        </div>
+        <div id="searchCount" class="search-count"></div>
+        <ul id="peopleList" class="person-list">
+          <li style="color:#999">No people added yet</li>
+        </ul>
+      </div>
+    </div>
+    <div id="cy">
+      <button class="reset-btn" id="resetBtn" onclick="resetLayout()" style="display:none" title="Reset graph layout to default">Reset Layout</button>
+      <div class="empty-state" id="emptyState">
+        <div style="font-size:48px">&#x1F333;</div>
+        <div>No family members yet</div>
+        <p>Add people using the sidebar, then create relationships between them.</p>
+      </div>
+    </div>
+  </div>
+  <!-- Context Menus -->
+  <div id="ctxNode" class="ctx-menu">
+    <div class="ctx-item" onclick="ctxEditPerson()"><span class="ctx-icon">&#9998;</span> Edit Person</div>
+    <div class="ctx-item" onclick="ctxAddRelFrom()"><span class="ctx-icon">&#10132;</span> Add Relationship From</div>
+    <div class="ctx-item" onclick="ctxAddRelTo()"><span class="ctx-icon">&#10132;</span> Add Relationship To</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item danger" onclick="ctxDeletePerson()"><span class="ctx-icon">&#10005;</span> Delete Person</div>
+  </div>
+  <div id="ctxEdge" class="ctx-menu">
+    <div class="ctx-item danger" onclick="ctxDeleteRelationship()"><span class="ctx-icon">&#10005;</span> Delete Relationship</div>
+  </div>
+  <div id="ctxBg" class="ctx-menu">
+    <div class="ctx-item" onclick="ctxAddPersonHere()"><span class="ctx-icon">&#43;</span> Add Person</div>
+  </div>
+
+  <!-- Edit Person Modal -->
+  <div id="editPersonModal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="editModalTitle">Edit Person</h3>
+      <input type="hidden" id="editPersonId">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="editPersonName">
+      </div>
+      <div class="form-group">
+        <label>Sex</label>
+        <select id="editPersonSex">
+          <option value="M">Male</option>
+          <option value="F">Female</option>
+          <option value="U">Unknown</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="editPersonNotes" placeholder="Optional notes..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('editPersonModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveEditPerson()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Relationship Modal -->
+  <div id="addRelModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Add Relationship</h3>
+      <div class="form-group">
+        <label>From Person</label>
+        <select id="modalRelFrom"></select>
+      </div>
+      <div class="form-group">
+        <label>Relationship</label>
+        <select id="modalRelType">
+          <option value="PARENT_OF">Parent of</option>
+          <option value="SPOUSE_OF">Spouse of</option>
+          <option value="SIBLING_OF">Sibling of</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>To Person</label>
+        <select id="modalRelTo"></select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('addRelModal')">Cancel</button>
+        <button class="btn-success" onclick="saveModalRelationship()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Person Modal (from background click) -->
+  <div id="addPersonModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Add Person</h3>
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="modalPersonName" placeholder="e.g. John Smith">
+      </div>
+      <div class="form-group">
+        <label>Sex</label>
+        <select id="modalPersonSex">
+          <option value="M">Male</option>
+          <option value="F">Female</option>
+          <option value="U">Unknown</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="modalPersonNotes" placeholder="Optional notes..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('addPersonModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveModalPerson()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/web/app.js?v=3"></script>
+</body>
+</html>

@@ -1,11 +1,23 @@
-from sqlalchemy.orm import Session
-from .models import Person, Relationship
+"""Build Cytoscape.js graph data from KuzuDB."""
+import kuzu
 
-def build_graph(db: Session):
-    people = db.query(Person).all()
-    rels = db.query(Relationship).all()
-    nodes = [{"data": {"id": p.id, "label": p.display_name}} for p in people]
-    edges = [{
-        "data": {"id": r.id, "source": r.from_person_id, "target": r.to_person_id, "type": r.type.value}
-    } for r in rels]
+
+def build_graph(conn: kuzu.Connection):
+    result = conn.execute("MATCH (p:Person) RETURN p.id, p.display_name")
+    nodes = []
+    while result.has_next():
+        row = result.get_next()
+        nodes.append({"data": {"id": row[0], "label": row[1]}})
+
+    edges = []
+    for rel_type in ["PARENT_OF", "SPOUSE_OF", "SIBLING_OF"]:
+        result = conn.execute(
+            f"MATCH (a:Person)-[r:{rel_type}]->(b:Person) RETURN r.id, a.id, b.id"
+        )
+        while result.has_next():
+            row = result.get_next()
+            edges.append({"data": {
+                "id": row[0], "source": row[1], "target": row[2], "type": rel_type
+            }})
+
     return {"nodes": nodes, "edges": edges}

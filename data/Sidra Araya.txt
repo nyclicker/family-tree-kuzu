@@ -1,0 +1,60 @@
+Person 1,Relation,Person 2,Gender,Details
+Gebreyohannes,Earliest Ancestor,,M,
+Araya,Child,Gebreyohannes,M,Highlight
+Kudusan,Child,Gebreyohannes,F
+Tikabo,Child,Gebreyohannes,M
+Askalu,Child,Gebreyohannes,F
+Madelina,Child,Gebreyohannes,F
+Nigisti GY,Child,Gebreyohannes,F
+Teka,Child,Araya,F,Highlight
+Afewerki A,Child,Araya,M
+Berhane A,Child,Araya,M
+Gebremeskel,Child,Araya,M
+Sara A,Child,Araya,F
+Tsigeweini A,Child,Araya,F
+Letebrhan,Child,Araya,F
+Girmay A,Child,Araya,M
+Russom,Child,Araya,M
+Tesfay T,Child,Tikabo,M
+Tsigereda T,Child,Tikabo,F
+Hani,Child,Tikabo,F
+Solomon Tikabo,Child,Tikabo,M
+Mehari T,Child,Tikabo,M
+Saba T,Child,Tikabo,F
+Selam T,Child,Tikabo,F
+Habtemichael (Nigisti),Child,Nigisti GY,M
+Weldemichael,Child,Nigisti GY,M
+Roma (Nigisti),Child,Nigisti GY,F
+Aregash,Child,Nigisti GY,F
+Tsegai,Child,Tsigeweini A,M
+Hadas,Child,Tsigeweini A,F
+#Abeba (Teka),Parent,Teka,F
+Abeba (Teka),Spouse,Araya,F
+Gonche,Parent,Abeba (Teka),M
+Ntsihiti,Child,Gonche,F
+Tsirha,Child,Gonche,F
+Yihdega,Child,Gonche,F
+Andemariam G,Child,Gonche,M
+Robel (Nitsihiti),Child,Ntsihiti,M
+Hiwet G,Child,Gonche,F
+Letensie (Tsirha),Child,Tsirha,F
+Belaynesh,Child,Tsirha,F
+Tekie (Tsirha),Child,Tsirha,M
+Beyene,Child,Tsirha,M
+Emuna,Child,Yihdega,F
+Yemane A,Child,Andemariam G,M
+Birikti,Child,Andemariam G,F
+Tewelde,Child,Andemariam G,M
+Miletu,Child,Andemariam G,F
+Tekle A,Child,Andemariam G,M
+Firweweini,Child,Berhane A,F
+Fitsum B,Child,Berhane A,M
+Amaniel B,Child,Berhane A,M
+Simon B,Child,Berhane A,M
+Iyob B,Child,Berhane A,M
+Negassi,Child,Berhane A,M
+Daniel B,Child,Berhane A,M
+Michael B,Child,Berhane A,M
+Temesgen,Child,Berhane A,M
+Tobias,Child,Amaniel B,M
+Aaron,Child,Amaniel B,M
