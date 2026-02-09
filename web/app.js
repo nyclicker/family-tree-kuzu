@@ -235,6 +235,8 @@ async function clearData() {
 
 function setDatasetName(name) {
   currentDatasetName = name;
+  if (name) localStorage.setItem('ft_dataset_name', name);
+  else localStorage.removeItem('ft_dataset_name');
   const el = document.getElementById('datasetInfo');
   if (el) el.textContent = name || 'No data loaded';
   const headerLabel = document.getElementById('datasetLabel');
@@ -576,15 +578,19 @@ function runFamilyLayout(animate) {
 
   // Position each group of spouse-connected trees together
   let xOffset = 0;
+  const positionedSoFar = new Set();  // track node IDs already placed
+
   for (const group of groupList) {
     // Position first (largest) tree in the group
     xOffset = positionSubtree(group[0], xOffset);
+    getSubtreeIds(group[0]).forEach(id => positionedSoFar.add(id));
 
     // Position remaining trees in this group, aligning spouses
     for (let i = 1; i < group.length; i++) {
       const root = group[i];
-      // Find if any node in this tree has a spouse in an already-positioned tree
       const treeIds = getSubtreeIds(root);
+
+      // Find if any node in this tree has a spouse in an already-positioned tree
       let spouseAnchor = null;
       for (const [s, t] of spousePairs) {
         if (treeIds.includes(s) && positions[t]) {
@@ -598,15 +604,13 @@ function runFamilyLayout(animate) {
       }
 
       // Position this tree starting after current content
-      const treeStart = xOffset + NODE_GAP;
-      positionSubtree(root, treeStart);
+      positionSubtree(root, xOffset + NODE_GAP);
 
       // If we found a spouse link, shift this tree so spouses are adjacent
       if (spouseAnchor && positions[spouseAnchor.thisNode] && positions[spouseAnchor.otherNode]) {
         const targetX = positions[spouseAnchor.otherNode].x + SPOUSE_GAP;
         const currentX = positions[spouseAnchor.thisNode].x;
         const shiftX = targetX - currentX;
-        // Also align Y (generation) if different
         const targetDepth = depth[spouseAnchor.otherNode] || 0;
         const currentDepth = depth[spouseAnchor.thisNode] || 0;
         const depthShift = targetDepth - currentDepth;
@@ -618,9 +622,43 @@ function runFamilyLayout(animate) {
           }
           if (depth[id] !== undefined) depth[id] += depthShift;
         }
+
+        // Resolve overlaps: check if shifted tree nodes collide with existing nodes
+        // Build a map of occupied X ranges per Y level for existing nodes
+        const occupiedByY = {};
+        for (const eid of positionedSoFar) {
+          if (!positions[eid]) continue;
+          const y = Math.round(positions[eid].y);
+          if (!occupiedByY[y]) occupiedByY[y] = [];
+          occupiedByY[y].push(positions[eid].x);
+        }
+
+        // Find the maximum overlap at any shared Y level
+        let maxOverlap = 0;
+        for (const id of treeIds) {
+          if (!positions[id]) continue;
+          const y = Math.round(positions[id].y);
+          const tx = positions[id].x;
+          const occupied = occupiedByY[y];
+          if (!occupied) continue;
+          for (const ox of occupied) {
+            const gap = Math.abs(tx - ox);
+            if (gap < NODE_GAP) {
+              maxOverlap = Math.max(maxOverlap, NODE_GAP - gap);
+            }
+          }
+        }
+
+        // Push the tree right to resolve overlap
+        if (maxOverlap > 0) {
+          for (const id of treeIds) {
+            if (positions[id]) positions[id].x += maxOverlap;
+          }
+        }
       }
 
-      // Update xOffset to after the rightmost node in this tree
+      // Track these nodes and update xOffset
+      treeIds.forEach(id => positionedSoFar.add(id));
       let maxX = xOffset;
       for (const id of treeIds) {
         if (positions[id] && positions[id].x > maxX) maxX = positions[id].x;
@@ -1546,6 +1584,7 @@ loadAvailableDatasets();
 loadPeople().then(async () => {
   await loadGraph();
   if (people.length > 0) {
-    setDatasetName('Family Tree');
+    const savedName = localStorage.getItem('ft_dataset_name');
+    setDatasetName(savedName || 'Family Tree');
   }
 });
