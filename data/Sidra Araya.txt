@@ -28,9 +28,9 @@ Roma (Nigisti),Child,Nigisti GY,F
 Aregash,Child,Nigisti GY,F
 Tsegai,Child,Tsigeweini A,M
 Hadas,Child,Tsigeweini A,F
-#Abeba (Teka),Parent,Teka,F
-Abeba (Teka),Spouse,Araya,F
-Gonche,Parent,Abeba (Teka),M
+Abeba,Parent,Teka,F
+Abeba,Spouse,Araya,F
+Gonche,Parent,Abeba,M
 Ntsihiti,Child,Gonche,F
 Tsirha,Child,Gonche,F
 Yihdega,Child,Gonche,F

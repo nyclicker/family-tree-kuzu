@@ -163,16 +163,16 @@ Yohan,Child,Amanuel,M
 Henok,Child,Mihret,M
 Snit,Child,Mihret,F
 Abigail,Child,Mihret,F
-#Dagnew Hadera,Spouse,Almaz,M
+Dagnew Hadera,Spouse,Almaz,M
 Delina Hadera,Child,Almaz,F
 Abiel Hadera,Child,Almaz,M
-#Semere Solomon,Spouse,Nigisti,M
+Semere Solomon,Spouse,Nigisti,M
 Bnehur Semere,Child,Nigisti,M
 Betelihem\nSemere,Child,Nigisti,F
 Mekseb Semere,Child,Nigisti,F
-#Akberet Ghirmay,Spouse,Yohannes I,F
+Akberet Ghirmay,Spouse,Yohannes I,F
 Dilyet,Child,Yohannes I,F
 Adonay,Child,Yohannes I,M
 Senay,Child,Yohannes I,M
-#Kibret Abraha,Spouse,Mebrat Isaac,M
+Kibret Abraha,Spouse,Mebrat Isaac,M
 Marina,Child,Mebrat Isaac,F

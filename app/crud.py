@@ -89,5 +89,140 @@ def find_person_by_name(conn: kuzu.Connection, display_name: str):
     return None
 
 
+def get_children(conn: kuzu.Connection, person_id: str):
+    """Get all children of a person (via outgoing PARENT_OF edges)."""
+    result = conn.execute(
+        "MATCH (p:Person)-[:PARENT_OF]->(c:Person) WHERE p.id = $id "
+        "RETURN c.id, c.display_name, c.sex, c.notes",
+        {"id": person_id}
+    )
+    children = []
+    while result.has_next():
+        children.append(_person_from_row(result.get_next()))
+    return children
+
+
+def _edge_exists(conn: kuzu.Connection, from_id: str, to_id: str, rel_type: str) -> bool:
+    """Check if an edge exists (checks reverse for symmetric relations)."""
+    result = conn.execute(
+        f"MATCH (a:Person)-[:{rel_type}]->(b:Person) "
+        f"WHERE a.id = $fid AND b.id = $tid RETURN count(*)",
+        {"fid": from_id, "tid": to_id}
+    )
+    if result.has_next() and result.get_next()[0] > 0:
+        return True
+    if rel_type in ("SPOUSE_OF", "SIBLING_OF"):
+        result = conn.execute(
+            f"MATCH (a:Person)-[:{rel_type}]->(b:Person) "
+            f"WHERE a.id = $fid AND b.id = $tid RETURN count(*)",
+            {"fid": to_id, "tid": from_id}
+        )
+        if result.has_next() and result.get_next()[0] > 0:
+            return True
+    return False
+
+
+def merge_person_into(conn: kuzu.Connection, keep_id: str, remove_id: str):
+    """Merge remove_id into keep_id: transfer all edges, update properties, delete remove_id."""
+    # Update keep's properties if remove has better data
+    keep = get_person(conn, keep_id)
+    remove = get_person(conn, remove_id)
+    if keep and remove:
+        changed = False
+        sex = keep["sex"]
+        notes = keep.get("notes") or ""
+        if sex == "U" and remove["sex"] != "U":
+            sex = remove["sex"]
+            changed = True
+        if not notes and remove.get("notes"):
+            notes = remove["notes"]
+            changed = True
+        if changed:
+            conn.execute(
+                "MATCH (p:Person) WHERE p.id = $id SET p.sex = $sex, p.notes = $notes",
+                {"id": keep_id, "sex": sex, "notes": notes}
+            )
+
+    # Transfer outgoing edges from remove to keep
+    for rel_type in VALID_REL_TYPES:
+        result = conn.execute(
+            f"MATCH (a:Person)-[:{rel_type}]->(b:Person) WHERE a.id = $id RETURN b.id",
+            {"id": remove_id}
+        )
+        targets = []
+        while result.has_next():
+            targets.append(result.get_next()[0])
+        for target_id in targets:
+            if target_id != keep_id and not _edge_exists(conn, keep_id, target_id, rel_type):
+                create_relationship(conn, keep_id, target_id, rel_type)
+
+    # Transfer incoming edges from remove to keep
+    for rel_type in VALID_REL_TYPES:
+        result = conn.execute(
+            f"MATCH (a:Person)-[:{rel_type}]->(b:Person) WHERE b.id = $id RETURN a.id",
+            {"id": remove_id}
+        )
+        sources = []
+        while result.has_next():
+            sources.append(result.get_next()[0])
+        for source_id in sources:
+            if source_id != keep_id and not _edge_exists(conn, source_id, keep_id, rel_type):
+                create_relationship(conn, source_id, keep_id, rel_type)
+
+    # Delete the merged person and all its edges
+    delete_person(conn, remove_id)
+
+
+def merge_spouse_children(conn: kuzu.Connection, spouse_a_id: str, spouse_b_id: str):
+    """After linking spouses, merge common children and share all children between both parents.
+
+    1. Children with matching names under both parents → merge into one node
+    2. Children only under A → also become children of B
+    3. Children only under B → also become children of A
+
+    Returns dict with merged, adopted_by_a, adopted_by_b lists."""
+    children_a = get_children(conn, spouse_a_id)
+    children_b = get_children(conn, spouse_b_id)
+
+    a_by_name = {c["display_name"]: c for c in children_a}
+    b_by_name = {c["display_name"]: c for c in children_b}
+
+    common_names = set(a_by_name.keys()) & set(b_by_name.keys())
+    a_only = set(a_by_name.keys()) - common_names
+    b_only = set(b_by_name.keys()) - common_names
+
+    # 1. Merge children with the same name
+    merged = []
+    for name in sorted(common_names):
+        keep = a_by_name[name]
+        remove = b_by_name[name]
+        if keep["id"] == remove["id"]:
+            continue  # already the same node
+        merge_person_into(conn, keep["id"], remove["id"])
+        merged.append({"name": name, "kept_id": keep["id"], "removed_id": remove["id"]})
+
+    # 2. Children only under A → add B as parent too
+    shared_with_b = []
+    for name in sorted(a_only):
+        child = a_by_name[name]
+        if not _edge_exists(conn, spouse_b_id, child["id"], "PARENT_OF"):
+            create_relationship(conn, spouse_b_id, child["id"], "PARENT_OF")
+            shared_with_b.append(name)
+
+    # 3. Children only under B → add A as parent too
+    shared_with_a = []
+    for name in sorted(b_only):
+        child = b_by_name[name]
+        if not _edge_exists(conn, spouse_a_id, child["id"], "PARENT_OF"):
+            create_relationship(conn, spouse_a_id, child["id"], "PARENT_OF")
+            shared_with_a.append(name)
+
+    return {
+        "merged": merged,
+        "shared_with_a": shared_with_a,
+        "shared_with_b": shared_with_b,
+    }
+
+
 def clear_all(conn: kuzu.Connection):
     conn.execute("MATCH (p:Person) DETACH DELETE p")

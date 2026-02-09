@@ -1,12 +1,43 @@
+import re
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, UploadFile, File
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 from .db import get_database, get_conn
 from . import crud, schemas, graph
 from .importer import import_csv_text, import_db_file
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+
+def _clean_display_names(conn):
+    """Post-import: strip \\n suffixes and parenthetical disambiguations from display names."""
+    result = conn.execute("MATCH (p:Person) RETURN p.id, p.display_name")
+    updates = []
+    while result.has_next():
+        row = result.get_next()
+        pid, name = row[0], row[1]
+        clean = name
+        # Remove newline and everything after it
+        nl = clean.find('\n')
+        if nl != -1:
+            clean = clean[:nl]
+        # Remove trailing parenthetical e.g. " (Desta)"
+        clean = re.sub(r'\s*\([^)]*\)\s*$', '', clean)
+        clean = clean.strip()
+        if clean and clean != name:
+            updates.append((pid, clean))
+    for pid, clean in updates:
+        conn.execute(
+            "MATCH (p:Person) WHERE p.id = $id SET p.display_name = $name",
+            {"id": pid, "name": clean}
+        )
+
+
+class DatasetLoadRequest(BaseModel):
+    files: list[str]
+    combine: bool = False
 
 
 @asynccontextmanager
@@ -40,7 +71,12 @@ def add_person(body: schemas.PersonCreate, conn=Depends(get_conn)):
 
 @app.post("/relationships")
 def add_rel(body: schemas.RelCreate, conn=Depends(get_conn)):
-    return crud.create_relationship(conn, body.from_person_id, body.to_person_id, body.type)
+    result = crud.create_relationship(conn, body.from_person_id, body.to_person_id, body.type)
+    if body.type == "SPOUSE_OF":
+        merged = crud.merge_spouse_children(conn, body.from_person_id, body.to_person_id)
+        if merged:
+            result["merged_children"] = merged
+    return result
 
 
 @app.put("/people/{person_id}", response_model=schemas.PersonOut)
@@ -74,16 +110,20 @@ def health():
     return {"ok": True}
 
 
-@app.post("/api/import/default")
-def import_default(conn=Depends(get_conn)):
-    """Auto-load all CSV/TXT files in the data dir if DB is empty."""
-    if crud.list_people(conn):
-        return {"skipped": True, "message": "Database already has data"}
+@app.get("/api/datasets")
+def list_datasets():
+    """List available data files in the data directory."""
     if not DATA_DIR.exists():
-        return {"skipped": True, "message": "No data directory"}
+        return []
     files = sorted(list(DATA_DIR.glob("*.csv")) + list(DATA_DIR.glob("*.txt")))
-    if not files:
-        return {"skipped": True, "message": "No data files found"}
+    return [{"name": f.stem, "filename": f.name} for f in files]
+
+
+@app.post("/api/import/dataset")
+def import_dataset(body: DatasetLoadRequest, conn=Depends(get_conn)):
+    """Load specific data files. combine=false clears DB first; combine=true adds to existing."""
+    if not DATA_DIR.exists():
+        return {"error": "No data directory"}
 
     all_people = 0
     all_rels = 0
@@ -91,23 +131,40 @@ def import_default(conn=Depends(get_conn)):
     all_errors = []
     dataset_names = []
 
-    for i, f in enumerate(files):
+    for i, filename in enumerate(body.files):
+        filepath = DATA_DIR / filename
+        if not filepath.exists():
+            all_errors.append({"line": 0, "type": "file_not_found",
+                               "message": f"File not found: {filename}"})
+            continue
+        clear = (i == 0 and not body.combine)
         result = import_csv_text(
-            conn, f.read_text(encoding="utf-8"),
-            dataset=f.stem, clear_first=(i == 0)
+            conn, filepath.read_text(encoding="utf-8"),
+            dataset=filepath.stem, clear_first=clear
         )
-        all_people = result["people"]  # cumulative count from DB
+        all_people = result["people"]
         all_rels += result["relationships"]
         all_fixes.extend(result["auto_fixes"])
         all_errors.extend(result["errors"])
-        dataset_names.append(f.stem)
+        dataset_names.append(filepath.stem)
 
-    name = ", ".join(dataset_names) if len(dataset_names) > 1 else dataset_names[0]
+    # Clean display names: strip \n suffixes and (parent) disambiguations
+    _clean_display_names(conn)
+    all_people = len(crud.list_people(conn))
+
+    name = ", ".join(dataset_names) if len(dataset_names) > 1 else (dataset_names[0] if dataset_names else "")
     return {
         "people": all_people, "relationships": all_rels,
         "auto_fixes": all_fixes, "errors": all_errors,
         "dataset_name": name,
     }
+
+
+@app.post("/api/clear")
+def clear_data(conn=Depends(get_conn)):
+    """Clear all data from the graph database."""
+    crud.clear_all(conn)
+    return {"ok": True}
 
 
 @app.post("/api/import/upload")
@@ -122,6 +179,8 @@ async def import_upload(file: UploadFile = File(...), conn=Depends(get_conn)):
         result = import_csv_text(conn, text)
     else:
         return {"error": f"Unsupported file type: {ext}. Use .csv, .txt, or .db"}
+    _clean_display_names(conn)
+    result["people"] = len(crud.list_people(conn))
     result["dataset_name"] = Path(name).stem
     return result
 

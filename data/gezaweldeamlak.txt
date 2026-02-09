@@ -16,7 +16,7 @@ Kifle,Child,Zeru TB,M
 Ablelom,Child,Zeru TB,M
 Teweldeberhan,Child,Zeru TB,M
 Weldeamlak\n(Bashay),Child,Weldegiorghis,M,
-#LeteSelase,Spouse,Weldeamlak\n(Bashay),F,Grandma
+LeteSelase,Spouse,Weldeamlak\n(Bashay),F,Grandma
 Desta,Child,Weldegiorghis,F,
 Gebriel,Child,Weldegiorghis,M,
 Gebrenegus,Child,Weldegiorghis,M,
@@ -33,7 +33,7 @@ Kidane Tekle,Child,Tekle GM,M,
 Ogbaldet I,Child,Abraham,M
 Ogbazghi,Child,Abraham,M,
 Tesfagabir I,Child,Abraham,M,
-Mehari,Child,Naizgi,M
+Mehari N,Child,Naizgi,M
 Nigisti Naizgi,Child,Naizgi,F
 Leterfiel WA,Child,Weldeamlak\n(Bashay),F
 Kidusan,Child,Weldeamlak\n(Bashay),F
@@ -74,7 +74,7 @@ Tesfamariam G,Child,Ghile,M
 Kidan,Child,Ghile,F
 Habtom,Child,Ghile,M
 Tesfagabr,Child,Ghile,M
-Mehari,Child,Ghile,M
+Mehari G,Child,Ghile,M
 Tesfaldet,Child,Ghile,M
 Almaz G,Child,Ghile,F
 Hanibal,Child,Tesfamariam G,M
@@ -184,7 +184,7 @@ Teklemichael,Child,Gebremeskel TG,M
 Genet GM,Child,Gebremeskel TG,F,deceased
 Solomon GM,Child,Gebremeskel TG,M
 Hadas GM,Child,Gebremeskel TG,F
-Tirhas,Child,Gebremeskel TG,F
+Tirhas GM,Child,Gebremeskel TG,F
 Eyob,Child,Gebremeskel TG,M,deceased
 Damaris,Child,Solomon GM,F
 Felegh,Child,Solomon GM,F
@@ -194,10 +194,10 @@ Abel TM,Child,Teklemichael,M
 Asmerom,Child,Hadas GM,M
 Rahwa,Child,Hadas GM,F
 Haben\n(Hadas),Child,Hadas GM,M
-Robel\n(Tirhas),Child,Tirhas,M
-Saba\n(Tirhas),Child,Tirhas,F
-Helen\n(Tirhas),Child,Tirhas,F
-Senait\n(Tirhas),Child,Tirhas,F
+Robel\n(Tirhas),Child,Tirhas GM,M
+Saba\n(Tirhas),Child,Tirhas GM,F
+Helen\n(Tirhas),Child,Tirhas GM,F
+Senait\n(Tirhas),Child,Tirhas GM,F
 Letensae,Child,Berhe,F
 Zeru B,Child,Berhe,M,deceased
 Habtom B,Child,Berhe,M,deceased
@@ -221,7 +221,7 @@ Yonas\n(Tsigereda),Child,Tsigereda,M
 Lemlem\n(Tsigereda),Child,Tsigereda,F
 Himan\n(Tsigereda),Child,Tsigereda,F
 Winta,Child,Tsigereda,F
-Tirhas,Child,Tsigereda,F
+Tirhas Ts,Child,Tsigereda,F
 Mebrahutu,Child,Tsigereda,M
 Semhar\n(Tsigereda),Child,Tsigereda,F
 Selam\n(Tsigereda),Child,Tsigereda,F

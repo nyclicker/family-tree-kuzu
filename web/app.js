@@ -178,6 +178,8 @@ async function addRelationship() {
       body: JSON.stringify({ from_person_id, to_person_id, type })
     });
     if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    showSpouseMergeReport(data);
     showStatus('relStatus', 'Relationship added', false);
     await refresh();
   } catch (e) {
@@ -185,30 +187,80 @@ async function addRelationship() {
   }
 }
 
-// ── Load Data: Auto-load default ──
+// ── Load Data: Dataset picker ──
 
-async function autoLoadDefault() {
+let availableDatasets = [];
+
+async function loadAvailableDatasets() {
   try {
-    const res = await fetch('/api/import/default', { method: 'POST' });
+    const res = await fetch('/api/datasets');
+    availableDatasets = await res.json();
+    renderDatasetPicker();
+  } catch (e) {
+    document.getElementById('datasetList').innerHTML = '<div style="padding:8px;color:#999">Could not load datasets</div>';
+  }
+}
+
+function renderDatasetPicker() {
+  const el = document.getElementById('datasetList');
+  if (availableDatasets.length === 0) {
+    el.innerHTML = '<div style="padding:8px;color:#999">No data files found in /data</div>';
+    return;
+  }
+  el.innerHTML = availableDatasets.map((ds, i) =>
+    `<div class="ds-item"><input type="checkbox" id="ds_${i}" value="${escapeHtml(ds.filename)}"><label for="ds_${i}">${escapeHtml(ds.name)}</label></div>`
+  ).join('');
+}
+
+async function loadSelectedDatasets(combine) {
+  const checkboxes = document.querySelectorAll('#datasetList input[type="checkbox"]:checked');
+  const files = Array.from(checkboxes).map(cb => cb.value);
+  if (files.length === 0) {
+    showStatus('loadStatus', 'Select at least one dataset', true);
+    return;
+  }
+  showStatus('loadStatus', 'Loading...', false);
+  try {
+    const res = await fetch('/api/import/dataset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files, combine })
+    });
     const data = await res.json();
-    if (data.skipped) return;
-    if (data.error) return;
-    setDatasetName(data.dataset_name || 'Default');
+    if (data.error) throw new Error(data.error);
+    setDatasetName(data.dataset_name || 'Family Tree');
     showImportReport(data);
     await refresh();
   } catch (e) {
-    // Silently fail — user can upload manually
+    showStatus('loadStatus', 'Error: ' + e.message, true);
+  }
+}
+
+async function clearData() {
+  if (!confirm('Clear all data from the graph? This cannot be undone.')) return;
+  try {
+    await fetch('/api/clear', { method: 'POST' });
+    setDatasetName('');
+    document.getElementById('importReportSection').style.display = 'none';
+    await refresh();
+    showStatus('loadStatus', 'All data cleared', false);
+  } catch (e) {
+    showStatus('loadStatus', 'Error: ' + e.message, true);
   }
 }
 
 function setDatasetName(name) {
   currentDatasetName = name;
   const el = document.getElementById('datasetInfo');
-  if (el) el.textContent = name;
+  if (el) el.textContent = name || 'No data loaded';
   const headerLabel = document.getElementById('datasetLabel');
-  if (headerLabel) headerLabel.textContent = name;
+  if (headerLabel) headerLabel.textContent = name || '';
   const saveBtn = document.getElementById('saveBtn');
   if (saveBtn) saveBtn.style.display = name ? 'inline-block' : 'none';
+  const clearBtn = document.getElementById('clearBtn');
+  if (clearBtn) clearBtn.style.display = name ? 'inline-block' : 'none';
+  const combineBtn = document.getElementById('combineBtn');
+  if (combineBtn) combineBtn.style.display = name ? 'inline-block' : 'none';
 }
 
 async function saveChanges() {
@@ -328,6 +380,26 @@ function showImportReport(data) {
   showStatus('loadStatus', errors.length > 0
     ? `Imported with ${errors.length} issue(s) — see report below`
     : `Import complete`, errors.length > 0);
+}
+
+// ── Spouse-Children Merge Report ──
+
+function showSpouseMergeReport(data) {
+  if (!data.merged_children) return;
+  const mc = data.merged_children;
+  const parts = [];
+  if (mc.merged && mc.merged.length > 0) {
+    parts.push(`Merged ${mc.merged.length} duplicate child(ren): ${mc.merged.map(m => m.name).join(', ')}`);
+  }
+  if (mc.shared_with_a && mc.shared_with_a.length > 0) {
+    parts.push(`Linked ${mc.shared_with_a.length} child(ren) to both parents: ${mc.shared_with_a.join(', ')}`);
+  }
+  if (mc.shared_with_b && mc.shared_with_b.length > 0) {
+    parts.push(`Linked ${mc.shared_with_b.length} child(ren) to both parents: ${mc.shared_with_b.join(', ')}`);
+  }
+  if (parts.length > 0) {
+    alert('Spouse children resolved:\n\n' + parts.join('\n'));
+  }
 }
 
 // ── Helpers ──
@@ -617,7 +689,9 @@ async function saveModalRelationship() {
       body: JSON.stringify({ from_person_id, to_person_id, type })
     });
     if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
     closeModal('addRelModal');
+    showSpouseMergeReport(data);
     await refresh();
   } catch (e) {
     alert('Error: ' + e.message);
@@ -841,11 +915,10 @@ async function loadGraph() {
 // ── Initialize ──
 
 setupDropZone();
+loadAvailableDatasets();
 loadPeople().then(async () => {
   await loadGraph();
-  if (people.length === 0) {
-    await autoLoadDefault();
-  } else {
+  if (people.length > 0) {
     setDatasetName('Family Tree');
   }
 });

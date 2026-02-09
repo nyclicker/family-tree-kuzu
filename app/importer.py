@@ -95,6 +95,7 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
 
     rename_map, ambiguous_versions, auto_fixes, errors = detect_and_resolve_duplicates(rows)
     person_registry = {}  # display_name -> {"id": ..., "sex": ..., "notes": ...}
+    created_edges = set()  # (from_id, to_id, rel_type) to prevent duplicates
     rel_count = 0
 
     def resolve_name(raw_name, parent_raw=None):
@@ -171,6 +172,25 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
                 if not found:
                     get_or_create(p2_name)
 
+    def add_edge(from_id, to_id, rel_type, line):
+        """Create edge if it doesn't already exist (prevents duplicates from redundant records)."""
+        nonlocal rel_count
+        edge_key = (from_id, to_id, rel_type)
+        # Also check reverse for spouse (A spouse B == B spouse A)
+        rev_key = (to_id, from_id, rel_type) if rel_type == "SPOUSE_OF" else None
+        if edge_key in created_edges or (rev_key and rev_key in created_edges):
+            auto_fixes.append({
+                "line": line, "type": "skip_duplicate_edge",
+                "message": f"Skipped duplicate {rel_type} edge (already exists)",
+            })
+            return
+        try:
+            crud.create_relationship(conn, from_id, to_id, rel_type)
+            created_edges.add(edge_key)
+            rel_count += 1
+        except Exception as e:
+            errors.append({"line": line, "type": "rel_error", "message": str(e)})
+
     # Pass 3: Create relationships
     for row in rows:
         p1_display = resolve_name(
@@ -184,11 +204,7 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             p1 = person_registry.get(p1_display)
             p2 = person_registry.get(p2_display)
             if p1 and p2:
-                try:
-                    crud.create_relationship(conn, p2["id"], p1["id"], "PARENT_OF")
-                    rel_count += 1
-                except Exception as e:
-                    errors.append({"line": row["line"], "type": "rel_error", "message": str(e)})
+                add_edge(p2["id"], p1["id"], "PARENT_OF", row["line"])
             else:
                 missing = p1_display if not p1 else p2_display
                 errors.append({
@@ -196,7 +212,6 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
                     "message": f'Could not find "{missing}" for relationship',
                 })
         elif row["relation"] == "Parent" and row["raw_p2"]:
-            # "Parent" means p1 IS THE PARENT OF p2
             p2_display, err = resolve_p2_reference(row["raw_p2"], p1_display, row["line"])
             if err:
                 err["line"] = row["line"]
@@ -204,11 +219,7 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             p1 = person_registry.get(p1_display)
             p2 = person_registry.get(p2_display)
             if p1 and p2:
-                try:
-                    crud.create_relationship(conn, p1["id"], p2["id"], "PARENT_OF")
-                    rel_count += 1
-                except Exception as e:
-                    errors.append({"line": row["line"], "type": "rel_error", "message": str(e)})
+                add_edge(p1["id"], p2["id"], "PARENT_OF", row["line"])
             else:
                 missing = p1_display if not p1 else p2_display
                 errors.append({
@@ -223,14 +234,19 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             p1 = person_registry.get(p1_display)
             p2 = person_registry.get(p2_display)
             if p1 and p2:
-                try:
-                    crud.create_relationship(conn, p1["id"], p2["id"], "SPOUSE_OF")
-                    rel_count += 1
-                except Exception as e:
-                    errors.append({"line": row["line"], "type": "rel_error", "message": str(e)})
+                add_edge(p1["id"], p2["id"], "SPOUSE_OF", row["line"])
+        elif row["relation"] == "Sibling" and row["raw_p2"]:
+            p2_display, err = resolve_p2_reference(row["raw_p2"], p1_display, row["line"])
+            if err:
+                err["line"] = row["line"]
+                errors.append(err)
+            p1 = person_registry.get(p1_display)
+            p2 = person_registry.get(p2_display)
+            if p1 and p2:
+                add_edge(p1["id"], p2["id"], "SIBLING_OF", row["line"])
         elif row["relation"] == "Earliest Ancestor":
             pass
-        elif row["relation"] and row["relation"] not in ("Child", "Parent", "Spouse", "Earliest Ancestor"):
+        elif row["relation"] and row["relation"] not in ("Child", "Parent", "Spouse", "Sibling", "Earliest Ancestor"):
             errors.append({
                 "line": row["line"], "type": "unknown_relation",
                 "message": f'Unknown relation type "{row["relation"]}"',
