@@ -798,6 +798,35 @@ async function saveAddParent() {
 
 // ── Context Menu: Add Spouse ──
 
+let spouseMode = 'new';  // 'new' or 'existing'
+
+function setSpouseMode(mode) {
+  spouseMode = mode;
+  document.getElementById('spouseNewFields').style.display = mode === 'new' ? 'block' : 'none';
+  document.getElementById('spouseExistingFields').style.display = mode === 'existing' ? 'block' : 'none';
+  document.getElementById('spouseModeNew').className = mode === 'new' ? 'btn-primary' : 'btn-secondary';
+  document.getElementById('spouseModeExisting').className = mode === 'existing' ? 'btn-primary' : 'btn-secondary';
+  if (mode === 'existing') {
+    populateSpouseSelect('');
+    document.getElementById('spouseSearchInput').value = '';
+  }
+}
+
+function populateSpouseSelect(query) {
+  const personId = document.getElementById('addSpousePersonId').value;
+  const q = (query || '').toLowerCase();
+  const filtered = people.filter(p => p.id !== personId && (!q || p.display_name.toLowerCase().includes(q)));
+  const sel = document.getElementById('spouseExistingSelect');
+  sel.innerHTML = filtered.map(p =>
+    `<option value="${p.id}">${escapeHtml(p.display_name)} (${p.sex})</option>`
+  ).join('');
+}
+
+function onSpouseSearchInput() {
+  const query = document.getElementById('spouseSearchInput').value.trim();
+  populateSpouseSelect(query);
+}
+
 async function ctxAddSpouse() {
   hideAllMenus();
   if (!ctxTargetNode) return;
@@ -815,41 +844,51 @@ async function ctxAddSpouse() {
   document.getElementById('addSpousePersonId').value = personId;
   document.getElementById('addSpouseModalTitle').textContent = `Add Spouse of ${personLabel}`;
   document.getElementById('addSpouseName').value = '';
+  document.getElementById('addSpouseNotes').value = '';
   // Default to opposite sex of the person
   const person = getPersonById(personId);
   document.getElementById('addSpouseSex').value = person && person.sex === 'M' ? 'F' : 'M';
-  document.getElementById('addSpouseNotes').value = '';
+  setSpouseMode('new');
   openModal('addSpouseModal');
 }
 
 async function saveAddSpouse() {
   const personId = document.getElementById('addSpousePersonId').value;
-  const name = document.getElementById('addSpouseName').value.trim();
-  if (!name) return;
-  const sex = document.getElementById('addSpouseSex').value;
-  const notes = document.getElementById('addSpouseNotes').value.trim() || null;
+  let spouseId;
   try {
-    const res = await fetch('/people', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ display_name: name, sex, notes })
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const spouse = await res.json();
+    if (spouseMode === 'existing') {
+      spouseId = document.getElementById('spouseExistingSelect').value;
+      if (!spouseId) { alert('Select a person from the list'); return; }
+      if (spouseId === personId) { alert('A person cannot be their own spouse'); return; }
+    } else {
+      const name = document.getElementById('addSpouseName').value.trim();
+      if (!name) { alert('Enter a name'); return; }
+      const sex = document.getElementById('addSpouseSex').value;
+      const notes = document.getElementById('addSpouseNotes').value.trim() || null;
+      const res = await fetch('/people', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: name, sex, notes })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const spouse = await res.json();
+      spouseId = spouse.id;
+    }
     const relRes = await fetch('/relationships', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from_person_id: personId, to_person_id: spouse.id, type: 'SPOUSE_OF' })
+      body: JSON.stringify({ from_person_id: personId, to_person_id: spouseId, type: 'SPOUSE_OF' })
     });
     if (!relRes.ok) {
-      await fetch(`/people/${spouse.id}`, { method: 'DELETE' });
+      // Only delete if we just created a new person
+      if (spouseMode === 'new') await fetch(`/people/${spouseId}`, { method: 'DELETE' });
       throw new Error(await relRes.text());
     }
     const data = await relRes.json();
     closeModal('addSpouseModal');
     showSpouseMergeReport(data);
     await refresh();
-    highlightNewNode(spouse.id);
+    highlightNewNode(spouseId);
   } catch (e) {
     alert('Error: ' + e.message);
   }

@@ -164,7 +164,7 @@
         <span style="font-size:11px; color:#aaa">
           Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse
         </span>
-        <span style="font-size:10px; color:#667; margin-left:12px">v1.0.1</span>
+        <span style="font-size:10px; color:#667; margin-left:12px">v1.0.2</span>
       </div>
       <button class="btn-header" id="exportPngBtn" onclick="exportGraphPng()" style="display:none" title="Download graph as PNG image">Export PNG</button>
       <button class="btn-header" id="exportSvgBtn" onclick="exportGraphSvg()" style="display:none" title="Download graph as SVG image">Export SVG</button>
@@ -412,20 +412,39 @@
       <h3 id="addSpouseModalTitle">Add Spouse</h3>
       <input type="hidden" id="addSpousePersonId">
       <div class="form-group">
-        <label>Spouse Name</label>
-        <input type="text" id="addSpouseName" placeholder="e.g. Jane Smith">
+        <label>Mode</label>
+        <div style="display:flex; gap:4px; margin-bottom:8px">
+          <button class="btn-primary" id="spouseModeNew" onclick="setSpouseMode('new')" style="flex:1; font-size:12px">Create New</button>
+          <button class="btn-secondary" id="spouseModeExisting" onclick="setSpouseMode('existing')" style="flex:1; font-size:12px">Link Existing</button>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Sex</label>
-        <select id="addSpouseSex">
-          <option value="F">Female</option>
-          <option value="M">Male</option>
-          <option value="U">Unknown</option>
-        </select>
+      <div id="spouseNewFields">
+        <div class="form-group">
+          <label>Spouse Name</label>
+          <input type="text" id="addSpouseName" placeholder="e.g. Jane Smith">
+        </div>
+        <div class="form-group">
+          <label>Sex</label>
+          <select id="addSpouseSex">
+            <option value="F">Female</option>
+            <option value="M">Male</option>
+            <option value="U">Unknown</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="addSpouseNotes" placeholder="Optional notes..."></textarea>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Notes</label>
-        <textarea id="addSpouseNotes" placeholder="Optional notes..."></textarea>
+      <div id="spouseExistingFields" style="display:none">
+        <div class="form-group">
+          <label>Search for person</label>
+          <input type="text" id="spouseSearchInput" placeholder="Type a name..." oninput="onSpouseSearchInput()">
+        </div>
+        <div class="form-group">
+          <label>Select person</label>
+          <select id="spouseExistingSelect" size="6" style="width:100%; font-size:13px; border:1px solid #ccc; border-radius:4px"></select>
+        </div>
       </div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeModal('addSpouseModal')">Cancel</button>
