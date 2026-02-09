@@ -624,35 +624,47 @@ function runFamilyLayout(animate) {
         }
 
         // Resolve overlaps: check if shifted tree nodes collide with existing nodes
-        // Build a map of occupied X ranges per Y level for existing nodes
-        const occupiedByY = {};
-        for (const eid of positionedSoFar) {
-          if (!positions[eid]) continue;
-          const y = Math.round(positions[eid].y);
-          if (!occupiedByY[y]) occupiedByY[y] = [];
-          occupiedByY[y].push(positions[eid].x);
+        function detectOverlap(treeNodeIds) {
+          const occupiedByY = {};
+          for (const eid of positionedSoFar) {
+            if (!positions[eid]) continue;
+            const y = Math.round(positions[eid].y);
+            if (!occupiedByY[y]) occupiedByY[y] = [];
+            occupiedByY[y].push(positions[eid].x);
+          }
+          let maxOvl = 0;
+          for (const id of treeNodeIds) {
+            if (!positions[id]) continue;
+            const y = Math.round(positions[id].y);
+            const tx = positions[id].x;
+            const occupied = occupiedByY[y];
+            if (!occupied) continue;
+            for (const ox of occupied) {
+              const gap = Math.abs(tx - ox);
+              if (gap < NODE_GAP) maxOvl = Math.max(maxOvl, NODE_GAP - gap);
+            }
+          }
+          return maxOvl;
         }
 
-        // Find the maximum overlap at any shared Y level
-        let maxOverlap = 0;
-        for (const id of treeIds) {
-          if (!positions[id]) continue;
-          const y = Math.round(positions[id].y);
-          const tx = positions[id].x;
-          const occupied = occupiedByY[y];
-          if (!occupied) continue;
-          for (const ox of occupied) {
-            const gap = Math.abs(tx - ox);
-            if (gap < NODE_GAP) {
-              maxOverlap = Math.max(maxOverlap, NODE_GAP - gap);
-            }
+        // Strategy 1: Push descendants (not the anchor) down one generation
+        // This keeps the couple side by side but staggers their subtrees vertically
+        const anchorId = spouseAnchor.thisNode;
+        let hasOverlap = detectOverlap(treeIds) > 0;
+        if (hasOverlap) {
+          // Push all nodes except the spouse anchor down by one RANK_GAP
+          for (const id of treeIds) {
+            if (id === anchorId) continue;
+            if (positions[id]) positions[id].y += RANK_GAP;
+            if (depth[id] !== undefined) depth[id] += 1;
           }
         }
 
-        // Push the tree right to resolve overlap
-        if (maxOverlap > 0) {
+        // Strategy 2: If still overlapping after push-down, push right
+        const remainingOverlap = detectOverlap(treeIds);
+        if (remainingOverlap > 0) {
           for (const id of treeIds) {
-            if (positions[id]) positions[id].x += maxOverlap;
+            if (positions[id]) positions[id].x += remainingOverlap;
           }
         }
       }

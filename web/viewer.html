@@ -223,12 +223,20 @@
             const shiftX = positions[spouseAnchor.otherNode].x + SPOUSE_GAP - positions[spouseAnchor.thisNode].x;
             const depthShift = (depth[spouseAnchor.otherNode] || 0) - (depth[spouseAnchor.thisNode] || 0);
             for (const id of treeIds) { if (positions[id]) { positions[id].x += shiftX; positions[id].y += depthShift * RANK_GAP; } if (depth[id] !== undefined) depth[id] += depthShift; }
-            // Resolve overlaps
-            const occupiedByY = {};
-            for (const eid of positionedSoFar) { if (!positions[eid]) continue; const y = Math.round(positions[eid].y); if (!occupiedByY[y]) occupiedByY[y] = []; occupiedByY[y].push(positions[eid].x); }
-            let maxOverlap = 0;
-            for (const id of treeIds) { if (!positions[id]) continue; const y = Math.round(positions[id].y), tx = positions[id].x, occ = occupiedByY[y]; if (!occ) continue; for (const ox of occ) { const gap = Math.abs(tx - ox); if (gap < NODE_GAP) maxOverlap = Math.max(maxOverlap, NODE_GAP - gap); } }
-            if (maxOverlap > 0) { for (const id of treeIds) { if (positions[id]) positions[id].x += maxOverlap; } }
+            // Resolve overlaps: push down first, then right if needed
+            function detectOverlap(tnIds) {
+              const oByY = {};
+              for (const eid of positionedSoFar) { if (!positions[eid]) continue; const y = Math.round(positions[eid].y); if (!oByY[y]) oByY[y] = []; oByY[y].push(positions[eid].x); }
+              let mo = 0;
+              for (const id of tnIds) { if (!positions[id]) continue; const y = Math.round(positions[id].y), tx = positions[id].x, occ = oByY[y]; if (!occ) continue; for (const ox of occ) { const g = Math.abs(tx - ox); if (g < NODE_GAP) mo = Math.max(mo, NODE_GAP - g); } }
+              return mo;
+            }
+            const anchorId = spouseAnchor.thisNode;
+            if (detectOverlap(treeIds) > 0) {
+              for (const id of treeIds) { if (id === anchorId) continue; if (positions[id]) positions[id].y += RANK_GAP; if (depth[id] !== undefined) depth[id] += 1; }
+            }
+            const remOvl = detectOverlap(treeIds);
+            if (remOvl > 0) { for (const id of treeIds) { if (positions[id]) positions[id].x += remOvl; } }
           }
           treeIds.forEach(id => positionedSoFar.add(id));
           let maxX = xOffset; for (const id of treeIds) { if (positions[id] && positions[id].x > maxX) maxX = positions[id].x; }
