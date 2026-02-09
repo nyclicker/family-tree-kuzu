@@ -450,7 +450,7 @@ function runFamilyLayout(animate) {
 
   const NODE_GAP = 70;   // horizontal gap between siblings
   const RANK_GAP = 160;  // vertical gap between generations
-  const SPOUSE_GAP = 50;  // offset for spouse nodes
+  const SPOUSE_GAP = 60;  // offset for spouse nodes
 
   // Build parent-child adjacency from PARENT_OF edges only
   const childrenOf = {};
@@ -460,6 +460,14 @@ function runFamilyLayout(animate) {
     if (e.data('type') === 'PARENT_OF') {
       childrenOf[e.data('source')].push(e.data('target'));
       if (!parentOf[e.data('target')]) parentOf[e.data('target')] = e.data('source');
+    }
+  });
+
+  // Build spouse pairs
+  const spousePairs = [];
+  cy.edges().forEach(e => {
+    if (e.data('type') === 'SPOUSE_OF') {
+      spousePairs.push([e.data('source'), e.data('target')]);
     }
   });
 
@@ -488,6 +496,51 @@ function runFamilyLayout(animate) {
 
   roots.forEach(r => setDepth(r, 0));
 
+  // Find which root each node belongs to
+  function findRoot(id) {
+    let cur = id;
+    while (parentOf[cur]) cur = parentOf[cur];
+    return cur;
+  }
+
+  // Group roots that are connected by spouse edges (union-find)
+  const rootGroup = {};
+  roots.forEach(r => { rootGroup[r] = r; });
+  function findGroup(r) {
+    while (rootGroup[r] !== r) { rootGroup[r] = rootGroup[rootGroup[r]]; r = rootGroup[r]; }
+    return r;
+  }
+  function unionGroups(a, b) {
+    const ga = findGroup(a), gb = findGroup(b);
+    if (ga !== gb) rootGroup[ga] = gb;
+  }
+  for (const [s, t] of spousePairs) {
+    const rs = findRoot(s), rt = findRoot(t);
+    if (rs !== rt && rootGroup[rs] !== undefined && rootGroup[rt] !== undefined) {
+      unionGroups(rs, rt);
+    }
+  }
+
+  // Collect root groups in order (largest group first)
+  const groups = {};
+  roots.forEach(r => {
+    const g = findGroup(r);
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(r);
+  });
+  function treeSize(id) {
+    let s = 1;
+    childrenOf[id].forEach(k => { s += treeSize(k); });
+    return s;
+  }
+  const groupList = Object.values(groups);
+  groupList.forEach(g => g.sort((a, b) => treeSize(b) - treeSize(a)));
+  groupList.sort((a, b) => {
+    const sa = a.reduce((sum, r) => sum + treeSize(r), 0);
+    const sb = b.reduce((sum, r) => sum + treeSize(r), 0);
+    return sb - sa;
+  });
+
   // Position subtree recursively: children first, then center parent
   const positions = {};
   function positionSubtree(id, xStart) {
@@ -507,21 +560,78 @@ function runFamilyLayout(animate) {
     return x;
   }
 
-  // Sort roots: largest subtree first
-  function treeSize(id) {
-    let s = 1;
-    childrenOf[id].forEach(k => { s += treeSize(k); });
-    return s;
+  // Collect all node IDs in a subtree
+  function getSubtreeIds(rootId) {
+    const ids = [rootId];
+    const queue = [rootId];
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      for (const kid of childrenOf[cur]) {
+        ids.push(kid);
+        queue.push(kid);
+      }
+    }
+    return ids;
   }
-  roots.sort((a, b) => treeSize(b) - treeSize(a));
 
-  // Position each root's tree
+  // Position each group of spouse-connected trees together
   let xOffset = 0;
-  for (const root of roots) {
-    xOffset = positionSubtree(root, xOffset) + NODE_GAP;
+  for (const group of groupList) {
+    // Position first (largest) tree in the group
+    xOffset = positionSubtree(group[0], xOffset);
+
+    // Position remaining trees in this group, aligning spouses
+    for (let i = 1; i < group.length; i++) {
+      const root = group[i];
+      // Find if any node in this tree has a spouse in an already-positioned tree
+      const treeIds = getSubtreeIds(root);
+      let spouseAnchor = null;
+      for (const [s, t] of spousePairs) {
+        if (treeIds.includes(s) && positions[t]) {
+          spouseAnchor = { thisNode: s, otherNode: t };
+          break;
+        }
+        if (treeIds.includes(t) && positions[s]) {
+          spouseAnchor = { thisNode: t, otherNode: s };
+          break;
+        }
+      }
+
+      // Position this tree starting after current content
+      const treeStart = xOffset + NODE_GAP;
+      positionSubtree(root, treeStart);
+
+      // If we found a spouse link, shift this tree so spouses are adjacent
+      if (spouseAnchor && positions[spouseAnchor.thisNode] && positions[spouseAnchor.otherNode]) {
+        const targetX = positions[spouseAnchor.otherNode].x + SPOUSE_GAP;
+        const currentX = positions[spouseAnchor.thisNode].x;
+        const shiftX = targetX - currentX;
+        // Also align Y (generation) if different
+        const targetDepth = depth[spouseAnchor.otherNode] || 0;
+        const currentDepth = depth[spouseAnchor.thisNode] || 0;
+        const depthShift = targetDepth - currentDepth;
+        // Shift all nodes in this tree
+        for (const id of treeIds) {
+          if (positions[id]) {
+            positions[id].x += shiftX;
+            positions[id].y += depthShift * RANK_GAP;
+          }
+          if (depth[id] !== undefined) depth[id] += depthShift;
+        }
+      }
+
+      // Update xOffset to after the rightmost node in this tree
+      let maxX = xOffset;
+      for (const id of treeIds) {
+        if (positions[id] && positions[id].x > maxX) maxX = positions[id].x;
+      }
+      xOffset = maxX + NODE_GAP;
+    }
+
+    xOffset += NODE_GAP;
   }
 
-  // Place spouse-connected nodes next to their partner
+  // Place spouse-connected nodes that aren't part of any tree (isolated spouses)
   cy.edges().forEach(e => {
     if (e.data('type') === 'SPOUSE_OF') {
       const s = e.data('source'), t = e.data('target');

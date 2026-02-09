@@ -155,7 +155,7 @@
 
     function runFamilyLayout() {
       if (!cy || cy.nodes().length === 0) return;
-      const NODE_GAP = 70, RANK_GAP = 160, SPOUSE_GAP = 50;
+      const NODE_GAP = 70, RANK_GAP = 160, SPOUSE_GAP = 60;
       const childrenOf = {}, parentOf = {};
       cy.nodes().forEach(n => { childrenOf[n.id()] = []; });
       cy.edges().forEach(e => {
@@ -163,6 +163,10 @@
           childrenOf[e.data('source')].push(e.data('target'));
           if (!parentOf[e.data('target')]) parentOf[e.data('target')] = e.data('source');
         }
+      });
+      const spousePairs = [];
+      cy.edges().forEach(e => {
+        if (e.data('type') === 'SPOUSE_OF') spousePairs.push([e.data('source'), e.data('target')]);
       });
       for (const id in childrenOf) {
         childrenOf[id].sort((a, b) => {
@@ -173,47 +177,64 @@
       }
       const depth = {};
       function setDepth(id, d) {
-        if (depth[id] === undefined || d > depth[id]) {
-          depth[id] = d;
-          childrenOf[id].forEach(kid => setDepth(kid, d + 1));
-        }
+        if (depth[id] === undefined || d > depth[id]) { depth[id] = d; childrenOf[id].forEach(kid => setDepth(kid, d + 1)); }
       }
       const roots = Object.keys(childrenOf).filter(id => !parentOf[id] && childrenOf[id].length > 0);
       const isolated = Object.keys(childrenOf).filter(id => !parentOf[id] && childrenOf[id].length === 0);
       roots.forEach(r => setDepth(r, 0));
+      function findRoot(id) { let c = id; while (parentOf[c]) c = parentOf[c]; return c; }
+      const rootGroup = {}; roots.forEach(r => { rootGroup[r] = r; });
+      function findGroup(r) { while (rootGroup[r] !== r) { rootGroup[r] = rootGroup[rootGroup[r]]; r = rootGroup[r]; } return r; }
+      function unionGroups(a, b) { const ga = findGroup(a), gb = findGroup(b); if (ga !== gb) rootGroup[ga] = gb; }
+      for (const [s, t] of spousePairs) {
+        const rs = findRoot(s), rt = findRoot(t);
+        if (rs !== rt && rootGroup[rs] !== undefined && rootGroup[rt] !== undefined) unionGroups(rs, rt);
+      }
+      const groups = {}; roots.forEach(r => { const g = findGroup(r); if (!groups[g]) groups[g] = []; groups[g].push(r); });
+      function treeSize(id) { let s = 1; childrenOf[id].forEach(k => { s += treeSize(k); }); return s; }
+      const groupList = Object.values(groups);
+      groupList.forEach(g => g.sort((a, b) => treeSize(b) - treeSize(a)));
+      groupList.sort((a, b) => b.reduce((s, r) => s + treeSize(r), 0) - a.reduce((s, r) => s + treeSize(r), 0));
       const positions = {};
       function positionSubtree(id, xStart) {
         const kids = childrenOf[id];
-        if (kids.length === 0) {
-          positions[id] = { x: xStart, y: (depth[id] || 0) * RANK_GAP };
-          return xStart + NODE_GAP;
-        }
+        if (kids.length === 0) { positions[id] = { x: xStart, y: (depth[id] || 0) * RANK_GAP }; return xStart + NODE_GAP; }
         let x = xStart;
         for (const kid of kids) x = positionSubtree(kid, x);
-        const firstX = positions[kids[0]].x;
-        const lastX = positions[kids[kids.length - 1]].x;
+        const firstX = positions[kids[0]].x, lastX = positions[kids[kids.length - 1]].x;
         positions[id] = { x: (firstX + lastX) / 2, y: (depth[id] || 0) * RANK_GAP };
         return x;
       }
-      function treeSize(id) { let s = 1; childrenOf[id].forEach(k => { s += treeSize(k); }); return s; }
-      roots.sort((a, b) => treeSize(b) - treeSize(a));
+      function getSubtreeIds(rid) { const ids = [rid], q = [rid]; while (q.length) { const c = q.shift(); for (const k of childrenOf[c]) { ids.push(k); q.push(k); } } return ids; }
       let xOffset = 0;
-      for (const root of roots) xOffset = positionSubtree(root, xOffset) + NODE_GAP;
+      for (const group of groupList) {
+        xOffset = positionSubtree(group[0], xOffset);
+        for (let i = 1; i < group.length; i++) {
+          const root = group[i], treeIds = getSubtreeIds(root);
+          let spouseAnchor = null;
+          for (const [s, t] of spousePairs) {
+            if (treeIds.includes(s) && positions[t]) { spouseAnchor = { thisNode: s, otherNode: t }; break; }
+            if (treeIds.includes(t) && positions[s]) { spouseAnchor = { thisNode: t, otherNode: s }; break; }
+          }
+          positionSubtree(root, xOffset + NODE_GAP);
+          if (spouseAnchor && positions[spouseAnchor.thisNode] && positions[spouseAnchor.otherNode]) {
+            const shiftX = positions[spouseAnchor.otherNode].x + SPOUSE_GAP - positions[spouseAnchor.thisNode].x;
+            const depthShift = (depth[spouseAnchor.otherNode] || 0) - (depth[spouseAnchor.thisNode] || 0);
+            for (const id of treeIds) { if (positions[id]) { positions[id].x += shiftX; positions[id].y += depthShift * RANK_GAP; } if (depth[id] !== undefined) depth[id] += depthShift; }
+          }
+          let maxX = xOffset; for (const id of treeIds) { if (positions[id] && positions[id].x > maxX) maxX = positions[id].x; }
+          xOffset = maxX + NODE_GAP;
+        }
+        xOffset += NODE_GAP;
+      }
       cy.edges().forEach(e => {
         if (e.data('type') === 'SPOUSE_OF') {
           const s = e.data('source'), t = e.data('target');
-          if (positions[s] && !positions[t]) {
-            depth[t] = depth[s] || 0;
-            positions[t] = { x: positions[s].x + SPOUSE_GAP, y: positions[s].y };
-          } else if (positions[t] && !positions[s]) {
-            depth[s] = depth[t] || 0;
-            positions[s] = { x: positions[t].x - SPOUSE_GAP, y: positions[t].y };
-          }
+          if (positions[s] && !positions[t]) { depth[t] = depth[s] || 0; positions[t] = { x: positions[s].x + SPOUSE_GAP, y: positions[s].y }; }
+          else if (positions[t] && !positions[s]) { depth[s] = depth[t] || 0; positions[s] = { x: positions[t].x - SPOUSE_GAP, y: positions[t].y }; }
         }
       });
-      isolated.forEach(id => {
-        if (!positions[id]) { depth[id] = 0; positions[id] = { x: xOffset, y: 0 }; xOffset += NODE_GAP; }
-      });
+      isolated.forEach(id => { if (!positions[id]) { depth[id] = 0; positions[id] = { x: xOffset, y: 0 }; xOffset += NODE_GAP; } });
       cy.nodes().forEach(n => { const p = positions[n.id()]; if (p) n.position(p); });
       cy.fit(40);
     }
