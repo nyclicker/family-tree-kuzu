@@ -155,7 +155,7 @@
 
     function runFamilyLayout() {
       if (!cy || cy.nodes().length === 0) return;
-      const NODE_GAP = 70, RANK_GAP = 160, SPOUSE_GAP = 60;
+      const NODE_GAP = 90, RANK_GAP = 220, SPOUSE_GAP = 70;
       const childrenOf = {}, parentOf = {};
       cy.nodes().forEach(n => { childrenOf[n.id()] = []; });
       cy.edges().forEach(e => {

@@ -450,9 +450,9 @@ async function refresh() {
 function runFamilyLayout(animate) {
   if (!cy || cy.nodes().length === 0) return;
 
-  const NODE_GAP = 70;   // horizontal gap between siblings
-  const RANK_GAP = 160;  // vertical gap between generations
-  const SPOUSE_GAP = 60;  // offset for spouse nodes
+  const NODE_GAP = 90;   // horizontal gap between siblings
+  const RANK_GAP = 220;  // vertical gap between generations
+  const SPOUSE_GAP = 70;  // offset for spouse nodes
 
   // Build parent-child adjacency from PARENT_OF edges only
   const childrenOf = {};
