@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Tree — Shared View</title>
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #333; }
+    header {
+      background: #2c3e50; color: white; padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 22px; font-weight: 600; }
+    .header-info { font-size: 13px; color: #aaa; }
+    .header-info strong { color: #ecf0f1; }
+
+    /* Auth screen */
+    #authScreen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: calc(100vh - 56px); text-align: center; padding: 40px;
+    }
+    #authScreen .icon { font-size: 64px; margin-bottom: 16px; }
+    #authScreen h2 { font-size: 20px; color: #2c3e50; margin-bottom: 8px; }
+    #authScreen p { color: #999; font-size: 14px; margin-bottom: 24px; }
+    #authScreen input {
+      padding: 10px 14px; width: 320px; max-width: 90vw; border: 1px solid #ccc;
+      border-radius: 4px; font-size: 15px; margin-bottom: 12px;
+    }
+    #authScreen button {
+      padding: 10px 24px; background: #3498db; color: white; border: none;
+      border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    #authScreen button:hover { background: #2980b9; }
+    #authError {
+      color: #e74c3c; font-size: 13px; margin-top: 8px; display: none;
+    }
+
+    /* Graph */
+    #graphScreen { display: none; height: calc(100vh - 56px); position: relative; }
+    #cy { width: 100%; height: 100%; background: #fafafa; }
+    .readonly-badge {
+      position: absolute; top: 10px; left: 10px; z-index: 10;
+      background: rgba(44,62,80,0.8); color: white; padding: 6px 14px;
+      border-radius: 4px; font-size: 12px; font-weight: 600;
+    }
+    .legend-bar {
+      position: absolute; bottom: 10px; left: 10px; z-index: 10;
+      background: rgba(255,255,255,0.9); padding: 8px 14px; border-radius: 4px;
+      font-size: 11px; color: #666; box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Family Tree</h1>
+    <div class="header-info">
+      <span id="datasetLabel"></span>
+      <span style="margin-left:12px; font-size:11px; color:#aaa">
+        Solid = Parent-Child &nbsp; Dashed = Spouse
+      </span>
+    </div>
+  </header>
+
+  <!-- Auth screen -->
+  <div id="authScreen">
+    <div class="icon">&#x1F333;</div>
+    <h2>Shared Family Tree</h2>
+    <p>Enter your email to view this family tree.</p>
+    <input type="email" id="authEmail" placeholder="your@email.com" onkeydown="if(event.key==='Enter')authenticate()">
+    <button onclick="authenticate()">View Tree</button>
+    <div id="authError"></div>
+  </div>
+
+  <!-- Graph screen (shown after auth) -->
+  <div id="graphScreen">
+    <div class="readonly-badge">Read-only view</div>
+    <div id="cy"></div>
+    <div class="legend-bar">
+      Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse
+    </div>
+  </div>
+
+  <script>
+    const TOKEN = window.location.pathname.split('/view/')[1]?.split('/')[0] || '';
+    let viewerEmail = '';
+    let cy = null;
+
+    const GEN_COLORS = [
+      '#8e44ad', '#2980b9', '#27ae60', '#e67e22', '#e74c3c',
+      '#1abc9c', '#d35400', '#3498db', '#9b59b6', '#2ecc71',
+      '#f39c12', '#16a085', '#c0392b', '#2c3e50'
+    ];
+
+    async function authenticate() {
+      const email = document.getElementById('authEmail').value.trim();
+      if (!email) return;
+      const errEl = document.getElementById('authError');
+      errEl.style.display = 'none';
+
+      try {
+        const res = await fetch(`/view/${TOKEN}/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          errEl.textContent = data.detail || 'Access denied';
+          errEl.style.display = 'block';
+          return;
+        }
+        const data = await res.json();
+        viewerEmail = email;
+        document.getElementById('datasetLabel').innerHTML = `<strong>${escapeHtml(data.dataset)}</strong>`;
+        document.getElementById('authScreen').style.display = 'none';
+        document.getElementById('graphScreen').style.display = 'block';
+        await loadGraph();
+      } catch (e) {
+        errEl.textContent = 'Error connecting to server';
+        errEl.style.display = 'block';
+      }
+    }
+
+    function computeGenerations(nodes, edges) {
+      const children = {};
+      const parents = {};
+      const nodeIds = new Set(nodes.map(n => n.data.id));
+      for (const id of nodeIds) { children[id] = []; parents[id] = []; }
+      for (const e of edges) {
+        if (e.data.type === 'PARENT_OF') {
+          children[e.data.source].push(e.data.target);
+          parents[e.data.target].push(e.data.source);
+        }
+      }
+      const roots = [...nodeIds].filter(id => parents[id].length === 0);
+      const gen = {};
+      const queue = roots.map(id => { gen[id] = 0; return id; });
+      while (queue.length > 0) {
+        const id = queue.shift();
+        for (const child of children[id]) {
+          if (!(child in gen) || gen[child] < gen[id] + 1) {
+            gen[child] = gen[id] + 1;
+            queue.push(child);
+          }
+        }
+      }
+      for (const id of nodeIds) {
+        if (!(id in gen)) gen[id] = 0;
+      }
+      return gen;
+    }
+
+    function runFamilyLayout() {
+      if (!cy || cy.nodes().length === 0) return;
+      const NODE_GAP = 70, RANK_GAP = 160, SPOUSE_GAP = 50;
+      const childrenOf = {}, parentOf = {};
+      cy.nodes().forEach(n => { childrenOf[n.id()] = []; });
+      cy.edges().forEach(e => {
+        if (e.data('type') === 'PARENT_OF') {
+          childrenOf[e.data('source')].push(e.data('target'));
+          if (!parentOf[e.data('target')]) parentOf[e.data('target')] = e.data('source');
+        }
+      });
+      for (const id in childrenOf) {
+        childrenOf[id].sort((a, b) => {
+          const na = cy.getElementById(a).data('label') || '';
+          const nb = cy.getElementById(b).data('label') || '';
+          return na.localeCompare(nb);
+        });
+      }
+      const depth = {};
+      function setDepth(id, d) {
+        if (depth[id] === undefined || d > depth[id]) {
+          depth[id] = d;
+          childrenOf[id].forEach(kid => setDepth(kid, d + 1));
+        }
+      }
+      const roots = Object.keys(childrenOf).filter(id => !parentOf[id] && childrenOf[id].length > 0);
+      const isolated = Object.keys(childrenOf).filter(id => !parentOf[id] && childrenOf[id].length === 0);
+      roots.forEach(r => setDepth(r, 0));
+      const positions = {};
+      function positionSubtree(id, xStart) {
+        const kids = childrenOf[id];
+        if (kids.length === 0) {
+          positions[id] = { x: xStart, y: (depth[id] || 0) * RANK_GAP };
+          return xStart + NODE_GAP;
+        }
+        let x = xStart;
+        for (const kid of kids) x = positionSubtree(kid, x);
+        const firstX = positions[kids[0]].x;
+        const lastX = positions[kids[kids.length - 1]].x;
+        positions[id] = { x: (firstX + lastX) / 2, y: (depth[id] || 0) * RANK_GAP };
+        return x;
+      }
+      function treeSize(id) { let s = 1; childrenOf[id].forEach(k => { s += treeSize(k); }); return s; }
+      roots.sort((a, b) => treeSize(b) - treeSize(a));
+      let xOffset = 0;
+      for (const root of roots) xOffset = positionSubtree(root, xOffset) + NODE_GAP;
+      cy.edges().forEach(e => {
+        if (e.data('type') === 'SPOUSE_OF') {
+          const s = e.data('source'), t = e.data('target');
+          if (positions[s] && !positions[t]) {
+            depth[t] = depth[s] || 0;
+            positions[t] = { x: positions[s].x + SPOUSE_GAP, y: positions[s].y };
+          } else if (positions[t] && !positions[s]) {
+            depth[s] = depth[t] || 0;
+            positions[s] = { x: positions[t].x - SPOUSE_GAP, y: positions[t].y };
+          }
+        }
+      });
+      isolated.forEach(id => {
+        if (!positions[id]) { depth[id] = 0; positions[id] = { x: xOffset, y: 0 }; xOffset += NODE_GAP; }
+      });
+      cy.nodes().forEach(n => { const p = positions[n.id()]; if (p) n.position(p); });
+      cy.fit(40);
+    }
+
+    async function loadGraph() {
+      const res = await fetch(`/view/${TOKEN}/graph?email=${encodeURIComponent(viewerEmail)}`);
+      if (!res.ok) { alert('Error loading graph'); return; }
+      const data = await res.json();
+
+      if (data.nodes.length === 0) {
+        document.getElementById('cy').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:16px">This tree is empty</div>';
+        return;
+      }
+
+      const generations = computeGenerations(data.nodes, data.edges);
+      const elements = [];
+      data.nodes.forEach(n => {
+        const gen = generations[n.data.id] || 0;
+        const color = GEN_COLORS[gen % GEN_COLORS.length];
+        elements.push({ data: { id: n.data.id, label: n.data.label, gen, color } });
+      });
+      data.edges.forEach(e => {
+        elements.push({ data: { id: e.data.id, source: e.data.source, target: e.data.target, type: e.data.type } });
+      });
+
+      cy = cytoscape({
+        container: document.getElementById('cy'),
+        elements,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'label': 'data(label)', 'text-valign': 'bottom', 'text-margin-y': 8,
+              'text-wrap': 'wrap', 'text-max-width': 120, 'font-size': 13, 'font-weight': 600,
+              'color': '#333', 'text-outline-color': '#fff', 'text-outline-width': 2,
+              'width': 50, 'height': 50, 'border-width': 3, 'border-color': '#fff',
+              'background-color': 'data(color)'
+            }
+          },
+          {
+            selector: 'node:selected',
+            style: { 'border-color': '#f39c12', 'border-width': 4, 'overlay-opacity': 0.1, 'overlay-color': '#f39c12' }
+          },
+          {
+            selector: 'edge[type="PARENT_OF"]',
+            style: {
+              'width': 2.5, 'line-color': '#7f8c8d', 'target-arrow-color': '#7f8c8d',
+              'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'arrow-scale': 1.2
+            }
+          },
+          {
+            selector: 'edge[type="SPOUSE_OF"]',
+            style: { 'width': 2, 'line-color': '#e74c3c', 'line-style': 'dashed', 'curve-style': 'bezier' }
+          }
+        ],
+        layout: { name: 'preset' },
+        minZoom: 0.2, maxZoom: 3, wheelSensitivity: 0.3,
+        autoungrabify: true  // prevent node dragging in read-only mode
+      });
+
+      runFamilyLayout();
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

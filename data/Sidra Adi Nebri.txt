@@ -1,0 +1,5 @@
+Person 1,Relation,Person 2,Gender,Details
+Kasa (Kahsai),Earliest Ancestor,M,Grandma family tree
+Tedla,Child,Kasa (Kahsai),M
+?,Child,Kasa (Kahsai),F
+Letegiorghis,Child,Tedla,F

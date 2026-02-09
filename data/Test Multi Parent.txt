@@ -1,0 +1,5 @@
+Person 1,Relation,Person 2,Gender,Details
+Andemariam,Earliest Ancestor,,M,Grandad
+Tekle,Child,Andemariam,M
+Letegiorghis,Spouse,Tekle,F
+Tedla,Parent,Letegiorghis,M,Grandma

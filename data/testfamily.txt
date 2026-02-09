@@ -1,0 +1,56 @@
+Person 1,Relation,Person 2,Gender,Details
+Gebsi,Earliest Ancestor,,M,Founder
+Tearenaizghi,Child,Gebsi,M,
+Kiflizghi,Child,Gebsi,M,
+Tesfazghi,Child,Gebsi,M,
+Andegerghis,Child,Tesfazghi,M
+Tesfit,Child,Andegerghis,M
+Zeru I,Child,Tesfit,M
+Weldeamlak I,Child,Zeru I,M
+Berhane,Child,Weldeamlak I,M
+Geremeskel,Child,Weldeamlak I,M
+Misiel,Child,Berhane,M
+Aynalem,Child,Misiel,M
+Fisha,Child,Misiel,M
+Weldehans,Chid,Misiel,M
+Zeru II,Child,Geremeskel,M,
+Habte,Child,Geremeskel,M,
+Tekle,Child,Geremeskel,M,
+Weldegiorghis,Child,Geremeskel,M,
+Tesfagioghis,Child,Zeru II,M
+Beyn,Child,Zeru II,M
+Kifle,Child,Zeru II,M
+Ablelom,Child,Zeru II,M
+Teweldeberhan,Child,Zeru II,M
+Weldeamlak II,Child,Weldegiorghis,M,
+LeteSelase,Spouse,Weldeamlak II,F,Grandma
+Weldeamlak II,Child,Weldegiorghis,M,
+Desta,Child,Weldegiorghis,F,
+Gebriel,Child,Weldegiorghis,M,
+Gebrenegus,Child,Weldegiorghis,M,
+Haile,Child,Weldegiorghis,M,
+Gebreyesus,Child,Weldegiorghis,M,
+Semaetu,Child,Weldegiorghis,M,
+Gebremichael,Child,Weldegiorghis,M,
+Abraham,Child,Habte,M,
+Naizgi,Child,Habte,M,
+Embaye,Child,Teklu,M,
+Araya,Child,Teklu,M,
+Gebreselassie,Child,Teklu,M,
+Kidane,Child,Teklu,M,
+Ogbaldet I,Child,Abraham,M
+Ogbazghi,Child,Abraham,M,
+Tesfagabir I,Child,Abraham,M,
+Mehari,Chid,Naizgi,M
+Nigisti,Chid,Naizgi,F
+Leterfield,Child,Weldeamlak II,F
+Fisihatsion,Child,Weldeamlak II,M
+Debretsion,Child,Weldeamlak II,M
+Hansu,Child,Weldeamlak II,F
+Ogbatsion,Child,Weldeamlak II,M
+Nebiat,Child,Weldeamlak II,F
+Tuccu,Child,Weldeamlak II,M
+Teklu,Child,Weldeamlak II,M
+Sebene,Child,Weldeamlak II,F
+Aklilu,Child,Tuccu,M,Me
+Zaid,Spouse,Aklilu,F,Love

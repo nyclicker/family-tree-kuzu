@@ -1,0 +1,69 @@
+Person 1,Relation,Person 2,Gender,Details
+Chirum,Earliest Ancestor,,M,
+Zerhariat,Child,Chirum,M
+Bekhit,Child,Zerhariat,M
+Tekie,Child,Bekhit,M,Highlight
+Rigbay,Spouse,Tekie,F
+Amleset,Child,Tekie,F
+Zufan,Child,Tekie,F
+Tesfamariam T,Child,Tekie,M
+Kidane T,Child,Tekie,M,Highlight
+Goitom,Child,Tekie,M
+Letensie,Child,Tekie,F
+Dehab Tekie,Child,Tekie,F
+Teka,Spouse,Kidane T,F,Highlight
+Habtemichael,Child,Dehab Tekie,M
+Leteberhan (Dehab),Child,Dehab Tekie,F
+Negish,Child,Dehab Tekie,F
+Timnit,Child,Dehab Tekie,F
+Silas,Child,Letensie,F
+Hiwet,Child,Letensie,F
+Maaza (Letensie),Child,Letensie,F
+Afewerki (Letensie),Child,Letensie,M
+Merathab,Child,Letensie,F
+Saba (Amleset),Child,Amleset,F
+Zeweldi (Zufan),Child,Zufan,M
+Nigisti (Zufan),Child,Zufan,F
+Amaniel,Child,Zufan,M
+Ainalem,Child,Zufan,F
+Hadas (Zufan),Child,Zufan,F
+Abrehet (Zufan),Child,Zufan,F
+Luwam,Child,Goitom,F
+Muna,Child,Goitom,F
+Nahom G,Child,Goitom,M
+Stefanos,Child,Tesfamariam T,M
+Yordanos,Child,Tesfamariam T,F
+Sara T,Child,Tesfamariam T,F
+Genet T,Child,Tesfamariam T,F
+Azieb,Child,Tesfamariam T,F
+Hirut,Child,Tesfamariam T,F
+Alazar,Child,Tesfamariam T,M
+Selam,Child,Tesfamariam T,F
+Solomon TM,Child,Tesfamariam T,M
+Eden,Child,Kidane T,F
+Helen K,Child,Kidane T,F
+Zaid,Child,Kidane T,F
+Tesfay,Child,Kidane T,M
+Girmay K,Child,Kidane T,M
+Sara K,Child,Kidane T,F
+Efrem II,Child,Kidane T,M
+Mussie B,Spouse,Eden,M
+Sidon,Child,Eden,F
+Simon Mussie,Child,Eden,M
+Yonas,Spouse,Helen K,M
+Rodas,Child,Helen K,F
+Daniel Y,Child,Helen K,M
+Aklilu,Spouse,Zaid,M
+Lulia,Child,Zaid,F
+Natalia,Child,Zaid,F
+Kidisti (Girmay),Spouse,Girmay K,F
+Heaven,Child,Girmay K,F
+Hermon,Child,Girmay K,M
+Muzit (Tesfay),Spouse,Tesfay,F
+Arsema,Child,Tesfay,F
+Elilta,Child,Tesfay,F
+Emnet,Child,Tesfay,M
+Espen,Spouse,Sara K,M
+Yacob,Child,Sara K,M
+Rebecca,Child,Sara K,F
+Simret K,Child,Kidane T,F

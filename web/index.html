@@ -7,6 +7,7 @@
   <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
   <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
   <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <script src="https://unpkg.com/cytoscape-svg@0.4.0/cytoscape-svg.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #333; }
@@ -76,6 +77,8 @@
     .ctx-item:hover { background: #f0f7ff; }
     .ctx-item.danger { color: #e74c3c; }
     .ctx-item.danger:hover { background: #fdf0ef; }
+    .ctx-item.disabled { color: #ccc; pointer-events: none; cursor: default; }
+    .ctx-item.disabled:hover { background: transparent; }
     .ctx-sep { height: 1px; background: #eee; margin: 4px 0; }
     .ctx-icon { width: 16px; text-align: center; font-size: 14px; }
 
@@ -134,22 +137,35 @@
 
     /* Dataset picker */
     .ds-item {
-      padding: 6px 8px; display: flex; align-items: center; gap: 6px;
-      cursor: pointer; transition: background 0.1s;
+      padding: 4px 8px; display: flex; align-items: center; gap: 6px;
+      cursor: pointer; transition: background 0.1s; justify-content: flex-start;
     }
     .ds-item:hover { background: #f0f7ff; }
-    .ds-item input[type="checkbox"] { margin: 0; cursor: pointer; }
-    .ds-item label { cursor: pointer; flex: 1; }
+    .ds-item input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
+    .ds-item span { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+
+    /* Export button in header */
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .btn-header {
+      padding: 6px 14px; font-size: 12px; font-weight: 600;
+      background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 4px; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-header:hover { background: rgba(255,255,255,0.25); }
   </style>
 </head>
 <body>
   <header>
     <h1>Family Tree</h1>
-    <div class="legend">
-      <span id="datasetLabel" style="font-weight:600; margin-right:16px"></span>
-      <span style="font-size:11px; color:#aaa">
-        Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse &nbsp; Dotted = Sibling
-      </span>
+    <div class="header-actions">
+      <div class="legend">
+        <span id="datasetLabel" style="font-weight:600; margin-right:16px"></span>
+        <span style="font-size:11px; color:#aaa">
+          Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse
+        </span>
+      </div>
+      <button class="btn-header" id="exportPngBtn" onclick="exportGraphPng()" style="display:none" title="Download graph as PNG image">Export PNG</button>
+      <button class="btn-header" id="exportSvgBtn" onclick="exportGraphSvg()" style="display:none" title="Download graph as SVG image">Export SVG</button>
     </div>
   </header>
   <div class="container">
@@ -159,13 +175,11 @@
         <h2>Dataset</h2>
         <div id="datasetInfo" style="font-size:14px;font-weight:600;color:#2c3e50;margin-bottom:10px">No data loaded</div>
         <div id="datasetPicker">
-          <div class="form-group">
-            <label>Available Family Trees</label>
-            <div id="datasetList" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:4px;padding:4px 0;font-size:13px">
-              Loading...
-            </div>
+          <div style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;margin-bottom:4px">Available Family Trees</div>
+          <div id="datasetList" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:4px;padding:4px 0;font-size:13px">
+            Loading...
           </div>
-          <div class="btn-row">
+          <div class="btn-row" style="margin-top:8px">
             <button class="btn-primary" onclick="loadSelectedDatasets(false)">Load Selected</button>
             <button class="btn-success" id="combineBtn" onclick="loadSelectedDatasets(true)" style="display:none" title="Add to current graph without clearing">+ Combine</button>
           </div>
@@ -221,27 +235,31 @@
         <div id="personStatus" class="status"></div>
       </div>
 
-      <!-- Add Relationship -->
-      <div class="section">
-        <h2>Add Relationship</h2>
-        <div class="form-group">
-          <label>From Person</label>
-          <select id="relFrom"></select>
+      <!-- Sharing -->
+      <div class="section" id="sharingSection" style="display:none">
+        <h2>Share Tree</h2>
+        <div id="shareLinks"></div>
+        <button class="btn-primary" onclick="createShareLink()" style="margin-top:8px">Create Share Link</button>
+
+        <div id="shareDetail" style="display:none; margin-top:16px; border-top:1px solid #eee; padding-top:12px">
+          <div style="font-size:12px; color:#666; margin-bottom:6px">Share link:</div>
+          <div style="display:flex; gap:4px; margin-bottom:12px">
+            <input type="text" id="shareLinkUrl" readonly style="flex:1; font-size:12px; background:#f9f9f9; cursor:text">
+            <button class="btn-primary" onclick="copyShareLink()" style="padding:6px 10px; font-size:11px">Copy</button>
+          </div>
+
+          <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Allowed Viewers</div>
+          <ul id="viewerList" class="person-list" style="max-height:150px; margin-bottom:8px"></ul>
+          <div style="display:flex; gap:4px">
+            <input type="email" id="viewerEmail" placeholder="viewer@email.com" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #ccc; border-radius:4px">
+            <button class="btn-success" onclick="addViewer()" style="padding:6px 10px; font-size:12px">Add</button>
+          </div>
+
+          <div style="margin-top:12px">
+            <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Access Log</div>
+            <ul id="accessLog" class="report-list" style="max-height:120px"></ul>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Relationship</label>
-          <select id="relType">
-            <option value="PARENT_OF">Parent of</option>
-            <option value="SPOUSE_OF">Spouse of</option>
-            <option value="SIBLING_OF">Sibling of</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>To Person</label>
-          <select id="relTo"></select>
-        </div>
-        <button class="btn-success" onclick="addRelationship()">Add Relationship</button>
-        <div id="relStatus" class="status"></div>
       </div>
 
       <!-- Search & People List -->
@@ -268,8 +286,11 @@
   <!-- Context Menus -->
   <div id="ctxNode" class="ctx-menu">
     <div class="ctx-item" onclick="ctxEditPerson()"><span class="ctx-icon">&#9998;</span> Edit Person</div>
-    <div class="ctx-item" onclick="ctxAddRelFrom()"><span class="ctx-icon">&#10132;</span> Add Relationship From</div>
-    <div class="ctx-item" onclick="ctxAddRelTo()"><span class="ctx-icon">&#10132;</span> Add Relationship To</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="ctxAddChild()"><span class="ctx-icon">&#x1F476;</span> Add Child</div>
+    <div class="ctx-item" id="ctxAddParentItem" onclick="ctxAddParent()"><span class="ctx-icon">&#x1F464;</span> Add Parent</div>
+    <div class="ctx-item" id="ctxAddSpouseItem" onclick="ctxAddSpouse()"><span class="ctx-icon">&#x1F48D;</span> Add Spouse</div>
+    <div class="ctx-item" id="ctxAddSiblingItem" onclick="ctxAddSibling()"><span class="ctx-icon">&#x1F46C;</span> Add Sibling</div>
     <div class="ctx-sep"></div>
     <div class="ctx-item danger" onclick="ctxDeletePerson()"><span class="ctx-icon">&#10005;</span> Delete Person</div>
   </div>
@@ -308,29 +329,133 @@
     </div>
   </div>
 
-  <!-- Add Relationship Modal -->
-  <div id="addRelModal" class="modal-overlay">
+  <!-- Add Child Modal -->
+  <div id="addChildModal" class="modal-overlay">
     <div class="modal">
-      <h3>Add Relationship</h3>
+      <h3 id="addChildModalTitle">Add Child</h3>
+      <input type="hidden" id="addChildParentId">
       <div class="form-group">
-        <label>From Person</label>
-        <select id="modalRelFrom"></select>
+        <label>Child Name</label>
+        <input type="text" id="addChildName" placeholder="e.g. Jane Smith">
       </div>
       <div class="form-group">
-        <label>Relationship</label>
-        <select id="modalRelType">
-          <option value="PARENT_OF">Parent of</option>
-          <option value="SPOUSE_OF">Spouse of</option>
-          <option value="SIBLING_OF">Sibling of</option>
+        <label>Sex</label>
+        <select id="addChildSex">
+          <option value="M">Male</option>
+          <option value="F">Female</option>
+          <option value="U">Unknown</option>
         </select>
       </div>
       <div class="form-group">
-        <label>To Person</label>
-        <select id="modalRelTo"></select>
+        <label>Notes</label>
+        <textarea id="addChildNotes" placeholder="Optional notes..."></textarea>
       </div>
       <div class="modal-actions">
-        <button class="btn-secondary" onclick="closeModal('addRelModal')">Cancel</button>
-        <button class="btn-success" onclick="saveModalRelationship()">Add</button>
+        <button class="btn-secondary" onclick="closeModal('addChildModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveAddChild()">Add Child</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Replace Parent Modal -->
+  <div id="addParentModal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="addParentModalTitle">Add Parent</h3>
+      <input type="hidden" id="addParentChildId">
+      <div class="form-group">
+        <label>Mode</label>
+        <div style="display:flex; gap:4px; margin-bottom:8px">
+          <button class="btn-primary" id="parentModeNew" onclick="setParentMode('new')" style="flex:1; font-size:12px">Create New</button>
+          <button class="btn-secondary" id="parentModeExisting" onclick="setParentMode('existing')" style="flex:1; font-size:12px">Link Existing</button>
+        </div>
+      </div>
+      <div id="parentNewFields">
+        <div class="form-group">
+          <label>Parent Name</label>
+          <input type="text" id="addParentName" placeholder="e.g. John Smith">
+        </div>
+        <div class="form-group">
+          <label>Sex</label>
+          <select id="addParentSex">
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="U">Unknown</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="addParentNotes" placeholder="Optional notes..."></textarea>
+        </div>
+      </div>
+      <div id="parentExistingFields" style="display:none">
+        <div class="form-group">
+          <label>Search for person</label>
+          <input type="text" id="parentSearchInput" placeholder="Type a name..." oninput="onParentSearchInput()">
+        </div>
+        <div class="form-group">
+          <label>Select person</label>
+          <select id="parentExistingSelect" size="6" style="width:100%; font-size:13px; border:1px solid #ccc; border-radius:4px"></select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('addParentModal')">Cancel</button>
+        <button class="btn-primary" id="addParentSubmitBtn" onclick="saveAddParent()">Add Parent</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Spouse Modal -->
+  <div id="addSpouseModal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="addSpouseModalTitle">Add Spouse</h3>
+      <input type="hidden" id="addSpousePersonId">
+      <div class="form-group">
+        <label>Spouse Name</label>
+        <input type="text" id="addSpouseName" placeholder="e.g. Jane Smith">
+      </div>
+      <div class="form-group">
+        <label>Sex</label>
+        <select id="addSpouseSex">
+          <option value="F">Female</option>
+          <option value="M">Male</option>
+          <option value="U">Unknown</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="addSpouseNotes" placeholder="Optional notes..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('addSpouseModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveAddSpouse()">Add Spouse</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Sibling Modal -->
+  <div id="addSiblingModal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="addSiblingModalTitle">Add Sibling</h3>
+      <input type="hidden" id="addSiblingPersonId">
+      <div class="form-group">
+        <label>Sibling Name</label>
+        <input type="text" id="addSiblingName" placeholder="e.g. Alex Smith">
+      </div>
+      <div class="form-group">
+        <label>Sex</label>
+        <select id="addSiblingSex">
+          <option value="M">Male</option>
+          <option value="F">Female</option>
+          <option value="U">Unknown</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="addSiblingNotes" placeholder="Optional notes..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('addSiblingModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveAddSibling()">Add Sibling</button>
       </div>
     </div>
   </div>

@@ -1,0 +1,111 @@
+Person 1,Relation,Person 2,Gender,Details
+Gebsi,Earliest Ancestor,,M,Founder
+Tearenaizghi,Child,Gebsi,M,
+Kiflizghi,Child,Gebsi,M,
+Tesfazghi,Child,Gebsi,M,
+Andegerghis,Child,Tesfazghi,M
+Tesfit,Child,Andegerghis,M
+Zeru I,Child,Tesfit,M
+Weldeamlak I,Child,Zeru I,M
+Berhane,Child,Weldeamlak I,M
+Geremeskel,Child,Weldeamlak I,M
+Misiel,Child,Berhane,M
+Aynalem,Child,Misiel,M
+Fisha,Child,Misiel,M
+Weldehans,Chid,Misiel,M
+Zeru II,Child,Geremeskel,M,
+Habte,Child,Geremeskel,M,
+Tekle,Child,Geremeskel,M,
+Weldegiorghis,Child,Geremeskel,M,
+Tesfagioghis,Child,Zeru II,M
+Beyn,Child,Zeru II,M
+Kifle,Child,Zeru II,M
+Ablelom,Child,Zeru II,M
+Teweldeberhan,Child,Zeru II,M
+Weldeamlak II,Child,Weldegiorghis,M,
+LeteSelase,Spouse,Weldeamlak II,F,Grandma
+Weldeamlak II,Child,Weldegiorghis,M,
+Desta,Child,Weldegiorghis,F,
+Gebriel,Child,Weldegiorghis,M,
+Gebrenegus,Child,Weldegiorghis,M,
+Haile,Child,Weldegiorghis,M,
+Gebreyesus,Child,Weldegiorghis,M,
+Semaetu,Child,Weldegiorghis,M,
+Gebremichael,Child,Weldegiorghis,M,
+Abraham,Child,Habte,M,
+Naizgi,Child,Habte,M,
+Embaye,Child,Tekle,M,
+Araya,Child,Tekle,M,
+Gebreselassie,Child,Tekle,M,
+Kidane,Child,Tekle,M,
+Ogbaldet I,Child,Abraham,M
+Ogbazghi,Child,Abraham,M,
+Tesfagabir I,Child,Abraham,M,
+Mehari,Chid,Naizgi,M
+Nigisti,Chid,Naizgi,F
+Leterfiel,Child,Weldeamlak II,F
+Fisihatsion,Child,Weldeamlak II,M
+Debretsion,Child,Weldeamlak II,M
+Hansu,Child,Weldeamlak II,F
+Ogbatsion,Child,Weldeamlak II,M
+Nebiat,Child,Weldeamlak II,F
+Tuccu,Child,Weldeamlak II,M
+Teklu,Child,Weldeamlak II,M
+Sebene,Child,Weldeamlak II,F
+Kahsai,Child,Desta,M
+Gile,Child,Desta,M
+Tsegay,Child,Gebriel,M
+Nigisti II,Child,Gebriel,F
+Tesfazgi,Child,Gebrenegus,M
+Semere,Child,Gebrenegus,M
+Siyum,Child,Haile,M
+Semere II,Child,Haile,M
+Keshi Gebreab,Child,Haile,M
+Tekle II,Child,Haile,M
+Dehab,Child,Gebreyesus,F
+Keshi Dagnew,Child,Semaetu,M
+Mesfin,Child,Gebremichael,M
+Afewerki,Child,Gebremichael,M
+Tsedal,Child,Gebremichael,F
+Abrehet,Child,Gebremichael,F
+Gebrehiwet,Child,Leterfiel,M
+Iyasu,Child,Leterfiel,M
+Gerezgiher,Child,Leterfiel,M
+Tsigereda,Child,Leterfiel,F
+Kidisan,Child,Leterfiel,F
+Abeba,Child,Fisihatsion,F
+Gerezgiher II,Child,Fisihatsion,M
+Beraki,Child,Fisihatsion,M
+Ethiopia,Child,Fisihatsion,F
+Saba,Child,Fisihatsion,F
+Isayas,Child,Fisihatsion,M
+Maaza,Child,Fisihatsion,F
+Daniel,Child,Fisihatsion,M
+Liya,Child,Fisihatsion,F
+Berhane II,Child,Fisihatsion,M
+Mussie,Child,Fisihatsion,M
+Teklehaimanot,Child,Debretsion,M
+Letenegus,Child,Debretsion,F
+Weini,Child,Debretsion,F
+Kidisti,Child,Debretsion,F
+Zeratsion,Child,Debretsion,M
+Abrahaley,Child,Hansu,M
+Elsa,Child,Hansu,F
+Biniam,Child,Ogbatsion,M
+Efrem,Child,Ogbatsion,M
+Almaz,Child,Teklu,F
+Aster,Child,Teklu,F
+Liya II,Child,Teklu,F
+Ambasajer,Child,Teklu,M
+Sirak,Child,Teklu,M
+Semhar,Child,Teklu,F
+Zenawi,Child,Teklu,M
+Aklilu,Child,Tuccu,M,Me
+Solomon,Child,Tuccu,M
+Selamawit,Child,Tuccu,F
+Tesfamariam,Child,Sebene,M
+Fesahaye,Child,Kidisan,M
+Ablelom II,Child,Kidisan,M
+Roma,Child,Dehab,F
+Asghedet,Child,Dehab,F
+Tsehaitu,Child,Dehab,F

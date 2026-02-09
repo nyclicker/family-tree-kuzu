@@ -17,6 +17,9 @@ let ctxTargetEdge = null;
 // Track whether user has dragged nodes
 let layoutDirty = false;
 
+// Track cursor position on the graph canvas for placing new nodes
+let lastCtxPosition = null;
+
 // ── Data loading ──
 
 async function loadPeople() {
@@ -24,7 +27,6 @@ async function loadPeople() {
   people = await res.json();
   const query = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
   renderPeopleList(query);
-  populateDropdowns();
 }
 
 // ── Search & People List ──
@@ -120,12 +122,6 @@ function navigateToPerson(personId) {
   cy.animate({ center: { eles: node }, zoom: 1.5 }, { duration: 400 });
 }
 
-function populateDropdowns() {
-  const opts = people.map(p => `<option value="${p.id}">${p.display_name}</option>`).join('');
-  const empty = '<option disabled>Add people first</option>';
-  document.getElementById('relFrom').innerHTML = opts || empty;
-  document.getElementById('relTo').innerHTML = opts || empty;
-}
 
 // ── Status messages ──
 
@@ -150,42 +146,17 @@ async function addPerson() {
       body: JSON.stringify({ display_name: name, sex, notes })
     });
     if (!res.ok) throw new Error(await res.text());
+    const newPerson = await res.json();
     document.getElementById('personName').value = '';
     document.getElementById('personNotes').value = '';
     showStatus('personStatus', `Added ${name}`, false);
     await refresh();
+    highlightNewNode(newPerson.id);
   } catch (e) {
     showStatus('personStatus', 'Error: ' + e.message, true);
   }
 }
 
-// ── Sidebar: Add Relationship ──
-
-async function addRelationship() {
-  const from_person_id = document.getElementById('relFrom').value;
-  const to_person_id = document.getElementById('relTo').value;
-  const type = document.getElementById('relType').value;
-  if (!from_person_id || !to_person_id) {
-    showStatus('relStatus', 'Select both people', true); return;
-  }
-  if (from_person_id === to_person_id) {
-    showStatus('relStatus', 'Cannot relate a person to themselves', true); return;
-  }
-  try {
-    const res = await fetch('/relationships', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from_person_id, to_person_id, type })
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    showSpouseMergeReport(data);
-    showStatus('relStatus', 'Relationship added', false);
-    await refresh();
-  } catch (e) {
-    showStatus('relStatus', 'Error: ' + e.message, true);
-  }
-}
 
 // ── Load Data: Dataset picker ──
 
@@ -208,7 +179,7 @@ function renderDatasetPicker() {
     return;
   }
   el.innerHTML = availableDatasets.map((ds, i) =>
-    `<div class="ds-item"><input type="checkbox" id="ds_${i}" value="${escapeHtml(ds.filename)}"><label for="ds_${i}">${escapeHtml(ds.name)}</label></div>`
+    `<div class="ds-item" onclick="this.querySelector('input').click()"><input type="checkbox" id="ds_${i}" value="${escapeHtml(ds.filename)}" onclick="event.stopPropagation()"><span style="cursor:pointer;color:#333;font-size:13px">${escapeHtml(ds.name)}</span></div>`
   ).join('');
 }
 
@@ -261,6 +232,8 @@ function setDatasetName(name) {
   if (clearBtn) clearBtn.style.display = name ? 'inline-block' : 'none';
   const combineBtn = document.getElementById('combineBtn');
   if (combineBtn) combineBtn.style.display = name ? 'inline-block' : 'none';
+  updateSharingSection();
+  if (name) loadShares();
 }
 
 async function saveChanges() {
@@ -441,6 +414,16 @@ function getPersonById(id) {
   return people.find(p => p.id === id);
 }
 
+// Flash-highlight a newly added node
+function highlightNewNode(nodeId) {
+  if (!cy) return;
+  const node = cy.getElementById(nodeId);
+  if (!node || node.empty()) return;
+  node.addClass('new-node');
+  setTimeout(() => node.removeClass('new-node'), 2500);
+  cy.animate({ center: { eles: node }, zoom: cy.zoom() }, { duration: 300 });
+}
+
 async function refresh() {
   await loadPeople();
   await loadGraph();
@@ -587,13 +570,6 @@ function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
 
-function populateModalDropdowns(fromId, toId) {
-  const opts = people.map(p => `<option value="${p.id}">${p.display_name}</option>`).join('');
-  document.getElementById('modalRelFrom').innerHTML = opts;
-  document.getElementById('modalRelTo').innerHTML = opts;
-  if (fromId) document.getElementById('modalRelFrom').value = fromId;
-  if (toId) document.getElementById('modalRelTo').value = toId;
-}
 
 // ── Context Menu: show/hide ──
 
@@ -662,41 +638,275 @@ async function ctxDeletePerson() {
   }
 }
 
-function ctxAddRelFrom() {
+function ctxAddChild() {
   hideAllMenus();
   if (!ctxTargetNode) return;
-  populateModalDropdowns(ctxTargetNode.data('id'), null);
-  openModal('addRelModal');
+  const parentId = ctxTargetNode.data('id');
+  const parentLabel = ctxTargetNode.data('label');
+  document.getElementById('addChildParentId').value = parentId;
+  document.getElementById('addChildModalTitle').textContent = `Add Child of ${parentLabel}`;
+  document.getElementById('addChildName').value = '';
+  document.getElementById('addChildSex').value = 'U';
+  document.getElementById('addChildNotes').value = '';
+  openModal('addChildModal');
 }
 
-function ctxAddRelTo() {
-  hideAllMenus();
-  if (!ctxTargetNode) return;
-  populateModalDropdowns(null, ctxTargetNode.data('id'));
-  openModal('addRelModal');
-}
-
-async function saveModalRelationship() {
-  const from_person_id = document.getElementById('modalRelFrom').value;
-  const to_person_id = document.getElementById('modalRelTo').value;
-  const type = document.getElementById('modalRelType').value;
-  if (!from_person_id || !to_person_id) return;
-  if (from_person_id === to_person_id) { alert('Cannot relate a person to themselves'); return; }
+async function saveAddChild() {
+  const parentId = document.getElementById('addChildParentId').value;
+  const name = document.getElementById('addChildName').value.trim();
+  if (!name) return;
+  const sex = document.getElementById('addChildSex').value;
+  const notes = document.getElementById('addChildNotes').value.trim() || null;
   try {
-    const res = await fetch('/relationships', {
+    // Create the child person
+    const res = await fetch('/people', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from_person_id, to_person_id, type })
+      body: JSON.stringify({ display_name: name, sex, notes })
     });
     if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    closeModal('addRelModal');
-    showSpouseMergeReport(data);
+    const child = await res.json();
+    // Create PARENT_OF relationship
+    const relRes = await fetch('/relationships', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from_person_id: parentId, to_person_id: child.id, type: 'PARENT_OF' })
+    });
+    if (!relRes.ok) throw new Error(await relRes.text());
+    closeModal('addChildModal');
     await refresh();
+    highlightNewNode(child.id);
   } catch (e) {
     alert('Error: ' + e.message);
   }
 }
+
+// ── Context Menu: Add Parent ──
+
+let parentMode = 'new';  // 'new' or 'existing'
+
+function setParentMode(mode) {
+  parentMode = mode;
+  document.getElementById('parentNewFields').style.display = mode === 'new' ? 'block' : 'none';
+  document.getElementById('parentExistingFields').style.display = mode === 'existing' ? 'block' : 'none';
+  document.getElementById('parentModeNew').className = mode === 'new' ? 'btn-primary' : 'btn-secondary';
+  document.getElementById('parentModeExisting').className = mode === 'existing' ? 'btn-primary' : 'btn-secondary';
+  if (mode === 'existing') {
+    populateParentSelect('');
+    document.getElementById('parentSearchInput').value = '';
+  }
+}
+
+function populateParentSelect(query) {
+  const childId = document.getElementById('addParentChildId').value;
+  const q = (query || '').toLowerCase();
+  const filtered = people.filter(p => p.id !== childId && (!q || p.display_name.toLowerCase().includes(q)));
+  const sel = document.getElementById('parentExistingSelect');
+  sel.innerHTML = filtered.map(p =>
+    `<option value="${p.id}">${escapeHtml(p.display_name)} (${p.sex})</option>`
+  ).join('');
+}
+
+function onParentSearchInput() {
+  const query = document.getElementById('parentSearchInput').value.trim();
+  populateParentSelect(query);
+}
+
+async function ctxAddParent() {
+  hideAllMenus();
+  if (!ctxTargetNode) return;
+  const childId = ctxTargetNode.data('id');
+  const childLabel = ctxTargetNode.data('label');
+  // Check if already has a parent
+  let existingParents = [];
+  try {
+    const res = await fetch(`/people/${childId}/parents`);
+    existingParents = await res.json();
+  } catch (e) { /* proceed */ }
+
+  document.getElementById('addParentChildId').value = childId;
+  document.getElementById('addParentName').value = '';
+  document.getElementById('addParentNotes').value = '';
+  document.getElementById('addParentSex').value = 'M';
+  setParentMode('new');
+
+  if (existingParents.length > 0) {
+    const parentNames = existingParents.map(p => p.display_name).join(', ');
+    if (!confirm(`"${childLabel}" already has a parent: ${parentNames}.\n\nDo you want to REPLACE the existing parent?`)) {
+      return;
+    }
+    document.getElementById('addParentModalTitle').textContent = `Replace Parent of ${childLabel}`;
+    document.getElementById('addParentSubmitBtn').textContent = 'Replace Parent';
+    document.getElementById('addParentChildId').dataset.replace = 'true';
+  } else {
+    document.getElementById('addParentModalTitle').textContent = `Add Parent of ${childLabel}`;
+    document.getElementById('addParentSubmitBtn').textContent = 'Add Parent';
+    document.getElementById('addParentChildId').dataset.replace = 'false';
+  }
+  openModal('addParentModal');
+}
+
+async function saveAddParent() {
+  const childId = document.getElementById('addParentChildId').value;
+  // Build request body based on mode
+  let body;
+  if (parentMode === 'existing') {
+    const selectedId = document.getElementById('parentExistingSelect').value;
+    if (!selectedId) { alert('Select a person from the list'); return; }
+    body = { existing_person_id: selectedId };
+  } else {
+    const name = document.getElementById('addParentName').value.trim();
+    if (!name) { alert('Enter a name'); return; }
+    body = {
+      display_name: name,
+      sex: document.getElementById('addParentSex').value,
+      notes: document.getElementById('addParentNotes').value.trim() || null,
+    };
+  }
+  try {
+    const res = await fetch(`/people/${childId}/set-parent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Failed to set parent');
+    }
+    const data = await res.json();
+    closeModal('addParentModal');
+    await refresh();
+    highlightNewNode(data.parent.id);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// ── Context Menu: Add Spouse ──
+
+async function ctxAddSpouse() {
+  hideAllMenus();
+  if (!ctxTargetNode) return;
+  const personId = ctxTargetNode.data('id');
+  const personLabel = ctxTargetNode.data('label');
+  // Check spouse count
+  try {
+    const res = await fetch(`/people/${personId}/relationship-counts`);
+    const counts = await res.json();
+    if (counts.spouses >= 1) {
+      alert(`"${personLabel}" already has a spouse. Remove the existing spouse relationship first.`);
+      return;
+    }
+  } catch (e) { /* proceed, server will validate */ }
+  document.getElementById('addSpousePersonId').value = personId;
+  document.getElementById('addSpouseModalTitle').textContent = `Add Spouse of ${personLabel}`;
+  document.getElementById('addSpouseName').value = '';
+  // Default to opposite sex of the person
+  const person = getPersonById(personId);
+  document.getElementById('addSpouseSex').value = person && person.sex === 'M' ? 'F' : 'M';
+  document.getElementById('addSpouseNotes').value = '';
+  openModal('addSpouseModal');
+}
+
+async function saveAddSpouse() {
+  const personId = document.getElementById('addSpousePersonId').value;
+  const name = document.getElementById('addSpouseName').value.trim();
+  if (!name) return;
+  const sex = document.getElementById('addSpouseSex').value;
+  const notes = document.getElementById('addSpouseNotes').value.trim() || null;
+  try {
+    const res = await fetch('/people', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_name: name, sex, notes })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const spouse = await res.json();
+    const relRes = await fetch('/relationships', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from_person_id: personId, to_person_id: spouse.id, type: 'SPOUSE_OF' })
+    });
+    if (!relRes.ok) {
+      await fetch(`/people/${spouse.id}`, { method: 'DELETE' });
+      throw new Error(await relRes.text());
+    }
+    const data = await relRes.json();
+    closeModal('addSpouseModal');
+    showSpouseMergeReport(data);
+    await refresh();
+    highlightNewNode(spouse.id);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// ── Context Menu: Add Sibling (= child of same parents) ──
+
+async function ctxAddSibling() {
+  hideAllMenus();
+  if (!ctxTargetNode) return;
+  const personId = ctxTargetNode.data('id');
+  const personLabel = ctxTargetNode.data('label');
+  // Check if the person has parents — siblings must share parents
+  try {
+    const res = await fetch(`/people/${personId}/parents`);
+    const parents = await res.json();
+    if (parents.length === 0) {
+      alert(`"${personLabel}" has no parents. Add a parent first, then add siblings.`);
+      return;
+    }
+  } catch (e) { /* proceed */ }
+  document.getElementById('addSiblingPersonId').value = personId;
+  document.getElementById('addSiblingModalTitle').textContent = `Add Sibling of ${personLabel}`;
+  document.getElementById('addSiblingName').value = '';
+  document.getElementById('addSiblingSex').value = 'U';
+  document.getElementById('addSiblingNotes').value = '';
+  openModal('addSiblingModal');
+}
+
+async function saveAddSibling() {
+  const personId = document.getElementById('addSiblingPersonId').value;
+  const name = document.getElementById('addSiblingName').value.trim();
+  if (!name) return;
+  const sex = document.getElementById('addSiblingSex').value;
+  const notes = document.getElementById('addSiblingNotes').value.trim() || null;
+  try {
+    // Get the target person's parents
+    const parentsRes = await fetch(`/people/${personId}/parents`);
+    const parents = await parentsRes.json();
+    if (parents.length === 0) {
+      alert('This person has no parents. Add a parent first.');
+      return;
+    }
+    // Create the sibling person
+    const res = await fetch('/people', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_name: name, sex, notes })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const sibling = await res.json();
+    // Add PARENT_OF from each parent to the new sibling
+    for (const parent of parents) {
+      const relRes = await fetch('/relationships', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_person_id: parent.id, to_person_id: sibling.id, type: 'PARENT_OF' })
+      });
+      if (!relRes.ok) {
+        await fetch(`/people/${sibling.id}`, { method: 'DELETE' });
+        throw new Error(await relRes.text());
+      }
+    }
+    closeModal('addSiblingModal');
+    await refresh();
+    highlightNewNode(sibling.id);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
 
 // ── Context Menu: Edge actions ──
 
@@ -729,6 +939,7 @@ async function saveModalPerson() {
   if (!name) return;
   const sex = document.getElementById('modalPersonSex').value;
   const notes = document.getElementById('modalPersonNotes').value.trim() || null;
+  const placementPos = lastCtxPosition;
   try {
     const res = await fetch('/people', {
       method: 'POST',
@@ -736,11 +947,205 @@ async function saveModalPerson() {
       body: JSON.stringify({ display_name: name, sex, notes })
     });
     if (!res.ok) throw new Error(await res.text());
+    const newPerson = await res.json();
     closeModal('addPersonModal');
     await refresh();
+    // Place at cursor position and highlight
+    if (cy && placementPos) {
+      const node = cy.getElementById(newPerson.id);
+      if (node && node.nonempty()) {
+        node.position(placementPos);
+      }
+    }
+    highlightNewNode(newPerson.id);
   } catch (e) {
     alert('Error: ' + e.message);
   }
+}
+
+// ── Sharing ──
+
+let activeShareToken = null;
+
+async function loadShares() {
+  try {
+    const res = await fetch('/api/shares');
+    const shares = await res.json();
+    renderShareLinks(shares);
+  } catch (e) { /* ignore */ }
+}
+
+function renderShareLinks(shares) {
+  const el = document.getElementById('shareLinks');
+  if (!shares || shares.length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:#999">No share links yet</div>';
+    return;
+  }
+  el.innerHTML = shares.map(s => {
+    const viewerCount = s.viewers ? s.viewers.length : 0;
+    const active = s.token === activeShareToken ? ' style="background:#ebf5fb;border-left:3px solid #3498db;padding-left:5px"' : '';
+    return `<div${active} style="padding:6px 0;font-size:13px;border-bottom:1px solid #eee;cursor:pointer" onclick="selectShare('${s.token}')">
+      <strong>${escapeHtml(s.dataset)}</strong>
+      <span style="color:#999;font-size:11px">${viewerCount} viewer(s)</span>
+      <span onclick="event.stopPropagation();deleteShare('${s.token}')" style="float:right;color:#e74c3c;cursor:pointer;font-size:11px" title="Delete">&#10005;</span>
+    </div>`;
+  }).join('');
+}
+
+async function createShareLink() {
+  if (!currentDatasetName) {
+    alert('Load a dataset first');
+    return;
+  }
+  try {
+    const res = await fetch('/api/shares', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataset: currentDatasetName })
+    });
+    const link = await res.json();
+    activeShareToken = link.token;
+    await loadShares();
+    selectShare(link.token);
+  } catch (e) {
+    alert('Error creating share link: ' + e.message);
+  }
+}
+
+async function deleteShare(token) {
+  if (!confirm('Delete this share link? All viewers will lose access.')) return;
+  try {
+    await fetch(`/api/shares/${token}`, { method: 'DELETE' });
+    if (activeShareToken === token) {
+      activeShareToken = null;
+      document.getElementById('shareDetail').style.display = 'none';
+    }
+    await loadShares();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function selectShare(token) {
+  activeShareToken = token;
+  const detail = document.getElementById('shareDetail');
+  detail.style.display = 'block';
+  const url = `${window.location.origin}/view/${token}`;
+  document.getElementById('shareLinkUrl').value = url;
+  await loadShares();
+  await loadViewers(token);
+  await loadAccessLog(token);
+}
+
+function copyShareLink() {
+  const input = document.getElementById('shareLinkUrl');
+  navigator.clipboard.writeText(input.value).then(() => {
+    const btn = input.nextElementSibling;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  });
+}
+
+async function loadViewers(token) {
+  try {
+    const res = await fetch(`/api/shares/${token}/viewers`);
+    const viewers = await res.json();
+    const ul = document.getElementById('viewerList');
+    if (viewers.length === 0) {
+      ul.innerHTML = '<li style="color:#999;font-size:12px">No viewers added yet</li>';
+      return;
+    }
+    ul.innerHTML = viewers.map(v =>
+      `<li style="font-size:12px;display:flex;justify-content:space-between;align-items:center">
+        <span>${escapeHtml(v.email)}${v.name ? ' (' + escapeHtml(v.name) + ')' : ''}</span>
+        <span onclick="removeViewer('${activeShareToken}','${v.id}')" style="color:#e74c3c;cursor:pointer;font-size:11px" title="Remove">&#10005;</span>
+      </li>`
+    ).join('');
+  } catch (e) { /* ignore */ }
+}
+
+async function addViewer() {
+  if (!activeShareToken) return;
+  const email = document.getElementById('viewerEmail').value.trim();
+  if (!email) return;
+  try {
+    const res = await fetch(`/api/shares/${activeShareToken}/viewers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    document.getElementById('viewerEmail').value = '';
+    await loadViewers(activeShareToken);
+    await loadShares();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function removeViewer(token, viewerId) {
+  try {
+    await fetch(`/api/shares/${token}/viewers/${viewerId}`, { method: 'DELETE' });
+    await loadViewers(token);
+    await loadShares();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function loadAccessLog(token) {
+  try {
+    const res = await fetch(`/api/shares/${token}/access-log`);
+    const logs = await res.json();
+    const ul = document.getElementById('accessLog');
+    if (logs.length === 0) {
+      ul.innerHTML = '<li style="color:#999;font-size:11px">No views yet</li>';
+      return;
+    }
+    ul.innerHTML = logs.map(l => {
+      const date = new Date(l.viewed_at).toLocaleString();
+      return `<li style="font-size:11px"><strong>${escapeHtml(l.email)}</strong> — ${date}${l.ip ? ' from ' + l.ip : ''}</li>`;
+    }).join('');
+  } catch (e) { /* ignore */ }
+}
+
+function updateSharingSection() {
+  const section = document.getElementById('sharingSection');
+  if (section) section.style.display = currentDatasetName ? 'block' : 'none';
+}
+
+// ── Export graph as image ──
+
+function exportGraphPng() {
+  if (!cy || cy.nodes().length === 0) return;
+  const png = cy.png({ full: true, scale: 2, bg: '#fafafa' });
+  const a = document.createElement('a');
+  a.href = png;
+  a.download = (currentDatasetName || 'family_tree') + '.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function exportGraphSvg() {
+  if (!cy || cy.nodes().length === 0) return;
+  const svgContent = cy.svg({ full: true, scale: 1, bg: '#fafafa' });
+  const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (currentDatasetName || 'family_tree') + '.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function updateExportButtons(hasNodes) {
+  const pngBtn = document.getElementById('exportPngBtn');
+  const svgBtn = document.getElementById('exportSvgBtn');
+  if (pngBtn) pngBtn.style.display = hasNodes ? 'inline-block' : 'none';
+  if (svgBtn) svgBtn.style.display = hasNodes ? 'inline-block' : 'none';
 }
 
 // ── Graph rendering ──
@@ -754,6 +1159,7 @@ async function loadGraph() {
   if (data.nodes.length === 0) {
     if (emptyState) emptyState.style.display = 'flex';
     if (resetBtn) resetBtn.style.display = 'none';
+    updateExportButtons(false);
     if (cy) { cy.destroy(); cy = null; }
     return;
   }
@@ -824,6 +1230,19 @@ async function loadGraph() {
         }
       },
       {
+        selector: 'node.new-node',
+        style: {
+          'border-color': '#f1c40f',
+          'border-width': 6,
+          'width': 70,
+          'height': 70,
+          'font-size': 16,
+          'z-index': 999,
+          'overlay-opacity': 0.2,
+          'overlay-color': '#f1c40f'
+        }
+      },
+      {
         selector: 'node.search-dimmed',
         style: { 'opacity': 0.15 }
       },
@@ -852,15 +1271,6 @@ async function loadGraph() {
         }
       },
       {
-        selector: 'edge[type="SIBLING_OF"]',
-        style: {
-          'width': 1.5,
-          'line-color': '#27ae60',
-          'line-style': 'dotted',
-          'curve-style': 'bezier'
-        }
-      },
-      {
         selector: 'edge:selected',
         style: {
           'width': 4,
@@ -877,15 +1287,36 @@ async function loadGraph() {
 
   // Run custom parent-centered layout (siblings always grouped under parent)
   runFamilyLayout(false);
+  updateExportButtons(true);
 
   // Show reset button when a node is dragged
   cy.on('dragfree', 'node', onNodeDrag);
 
   // Context menu events
-  cy.on('cxttap', 'node', function(evt) {
+  cy.on('cxttap', 'node', async function(evt) {
     evt.originalEvent.preventDefault();
     ctxTargetNode = evt.target;
     ctxTargetEdge = null;
+    // Fetch relationship counts to enable/disable menu items
+    const parentItem = document.getElementById('ctxAddParentItem');
+    const spouseItem = document.getElementById('ctxAddSpouseItem');
+    const siblingItem = document.getElementById('ctxAddSiblingItem');
+    parentItem.className = 'ctx-item';
+    parentItem.innerHTML = '<span class="ctx-icon">&#x1F464;</span> Add Parent';
+    spouseItem.className = 'ctx-item';
+    siblingItem.className = 'ctx-item';
+    try {
+      const res = await fetch(`/people/${evt.target.data('id')}/relationship-counts`);
+      const counts = await res.json();
+      if (counts.parents >= 1) {
+        parentItem.innerHTML = '<span class="ctx-icon">&#x1F504;</span> Replace Parent';
+      }
+      if (counts.parents === 0) {
+        siblingItem.className = 'ctx-item disabled';
+        siblingItem.title = 'Add a parent first';
+      }
+      if (counts.spouses >= 1) spouseItem.className = 'ctx-item disabled';
+    } catch (e) { /* show enabled by default */ }
     showMenu('ctxNode', evt.originalEvent.clientX, evt.originalEvent.clientY);
   });
 
@@ -901,6 +1332,7 @@ async function loadGraph() {
       evt.originalEvent.preventDefault();
       ctxTargetNode = null;
       ctxTargetEdge = null;
+      lastCtxPosition = evt.position;  // graph-space coords for placing new node
       showMenu('ctxBg', evt.originalEvent.clientX, evt.originalEvent.clientY);
     }
   });

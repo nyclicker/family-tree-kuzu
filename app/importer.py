@@ -236,6 +236,7 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             if p1 and p2:
                 add_edge(p1["id"], p2["id"], "SPOUSE_OF", row["line"])
         elif row["relation"] == "Sibling" and row["raw_p2"]:
+            # Sibling = share the same parents. Find p2's parents and add them as parents of p1.
             p2_display, err = resolve_p2_reference(row["raw_p2"], p1_display, row["line"])
             if err:
                 err["line"] = row["line"]
@@ -243,7 +244,22 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             p1 = person_registry.get(p1_display)
             p2 = person_registry.get(p2_display)
             if p1 and p2:
-                add_edge(p1["id"], p2["id"], "SIBLING_OF", row["line"])
+                # Find p2's parents and make them parents of p1 too
+                p2_parents = crud.get_parents(conn, p2["id"])
+                if p2_parents:
+                    for parent in p2_parents:
+                        add_edge(parent["id"], p1["id"], "PARENT_OF", row["line"])
+                else:
+                    # p2 has no parents yet — find p1's parents and make them parents of p2
+                    p1_parents = crud.get_parents(conn, p1["id"])
+                    if p1_parents:
+                        for parent in p1_parents:
+                            add_edge(parent["id"], p2["id"], "PARENT_OF", row["line"])
+                    else:
+                        auto_fixes.append({
+                            "line": row["line"], "type": "sibling_no_parent",
+                            "message": f'Sibling "{p1_display}" and "{p2_display}" have no parents — cannot link as siblings',
+                        })
         elif row["relation"] == "Earliest Ancestor":
             pass
         elif row["relation"] and row["relation"] not in ("Child", "Parent", "Spouse", "Sibling", "Earliest Ancestor"):

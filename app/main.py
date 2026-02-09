@@ -1,11 +1,11 @@
 import re
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, UploadFile, File
-from fastapi.responses import FileResponse, Response
+from fastapi import FastAPI, Depends, UploadFile, File, Request, HTTPException
+from fastapi.responses import FileResponse, Response, HTMLResponse
 from pydantic import BaseModel
 from .db import get_database, get_conn
-from . import crud, schemas, graph
+from . import crud, schemas, graph, sharing
 from .importer import import_csv_text, import_db_file
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -71,6 +71,19 @@ def add_person(body: schemas.PersonCreate, conn=Depends(get_conn)):
 
 @app.post("/relationships")
 def add_rel(body: schemas.RelCreate, conn=Depends(get_conn)):
+    # Validate constraints
+    if body.type == "PARENT_OF":
+        child_parents = crud.count_parents(conn, body.to_person_id)
+        if child_parents >= 1:
+            raise HTTPException(400, "This person already has a parent. Use 'Replace Parent' to change it.")
+    if body.type == "SPOUSE_OF":
+        from_spouses = crud.count_spouses(conn, body.from_person_id)
+        to_spouses = crud.count_spouses(conn, body.to_person_id)
+        if from_spouses >= 1:
+            raise HTTPException(400, "This person already has a spouse.")
+        if to_spouses >= 1:
+            raise HTTPException(400, "The other person already has a spouse.")
+
     result = crud.create_relationship(conn, body.from_person_id, body.to_person_id, body.type)
     if body.type == "SPOUSE_OF":
         merged = crud.merge_spouse_children(conn, body.from_person_id, body.to_person_id)
@@ -98,6 +111,61 @@ def delete_person(person_id: str, conn=Depends(get_conn)):
 def delete_rel(rel_id: str, conn=Depends(get_conn)):
     crud.delete_relationship(conn, rel_id)
     return {"ok": True}
+
+
+@app.get("/people/{person_id}/parents", response_model=list[schemas.PersonOut])
+def get_parents(person_id: str, conn=Depends(get_conn)):
+    """Get the parents of a person."""
+    return crud.get_parents(conn, person_id)
+
+
+class SetParentRequest(BaseModel):
+    """Set parent: either create a new person or link an existing one."""
+    existing_person_id: str | None = None  # Link existing person
+    display_name: str | None = None         # Create new person
+    sex: str = "U"
+    notes: str | None = None
+
+
+@app.post("/people/{person_id}/set-parent")
+def set_parent(person_id: str, body: SetParentRequest, conn=Depends(get_conn)):
+    """Set (or replace) the parent of a person.
+    Provide existing_person_id to link an existing person,
+    or display_name to create a new one."""
+    existing_parents = crud.get_parents(conn, person_id)
+    removed = []
+    # Remove existing parent relationships if any
+    for parent in existing_parents:
+        crud.delete_parent_relationship(conn, parent["id"], person_id)
+        removed.append(parent["display_name"])
+
+    # Determine the parent: existing or new
+    if body.existing_person_id:
+        parent_person = crud.get_person(conn, body.existing_person_id)
+        if not parent_person:
+            raise HTTPException(404, "Selected parent person not found")
+        # Prevent self-parenting
+        if body.existing_person_id == person_id:
+            raise HTTPException(400, "A person cannot be their own parent")
+    elif body.display_name:
+        parent_person = crud.create_person(conn, body.display_name, body.sex, body.notes)
+    else:
+        raise HTTPException(400, "Provide existing_person_id or display_name")
+
+    crud.create_relationship(conn, parent_person["id"], person_id, "PARENT_OF")
+    return {
+        "parent": parent_person,
+        "removed_parents": removed,
+    }
+
+
+@app.get("/people/{person_id}/relationship-counts")
+def relationship_counts(person_id: str, conn=Depends(get_conn)):
+    """Get counts of parents and spouses for validation."""
+    return {
+        "parents": crud.count_parents(conn, person_id),
+        "spouses": crud.count_spouses(conn, person_id),
+    }
 
 
 @app.get("/graph", response_model=schemas.GraphOut)
@@ -185,6 +253,112 @@ async def import_upload(file: UploadFile = File(...), conn=Depends(get_conn)):
     return result
 
 
+# ── Sharing endpoints ──
+
+
+class ShareCreateRequest(BaseModel):
+    dataset: str
+
+
+class ViewerAddRequest(BaseModel):
+    email: str
+    name: str = ""
+
+
+class ViewerAuthRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/shares")
+def create_share(body: ShareCreateRequest, conn=Depends(get_conn)):
+    """Create a share link for a dataset."""
+    link = sharing.create_share_link(conn, body.dataset)
+    return link
+
+
+@app.get("/api/shares")
+def list_shares(conn=Depends(get_conn)):
+    """List all share links."""
+    links = sharing.list_share_links(conn)
+    for link in links:
+        link["viewers"] = sharing.list_viewers(conn, link["token"])
+    return links
+
+
+@app.delete("/api/shares/{token}")
+def delete_share(token: str, conn=Depends(get_conn)):
+    """Delete a share link."""
+    sharing.delete_share_link(conn, token)
+    return {"ok": True}
+
+
+@app.post("/api/shares/{token}/viewers")
+def add_share_viewer(token: str, body: ViewerAddRequest, conn=Depends(get_conn)):
+    """Add a viewer to a share link."""
+    link = sharing.get_share_link(conn, token)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    viewer = sharing.add_viewer(conn, token, body.email, body.name)
+    return viewer
+
+
+@app.delete("/api/shares/{token}/viewers/{viewer_id}")
+def remove_share_viewer(token: str, viewer_id: str, conn=Depends(get_conn)):
+    """Remove a viewer from a share link."""
+    sharing.remove_viewer(conn, token, viewer_id)
+    return {"ok": True}
+
+
+@app.get("/api/shares/{token}/viewers")
+def get_share_viewers(token: str, conn=Depends(get_conn)):
+    """List viewers for a share link."""
+    return sharing.list_viewers(conn, token)
+
+
+@app.get("/api/shares/{token}/access-log")
+def get_share_access_log(token: str, conn=Depends(get_conn)):
+    """Get access log for a share link."""
+    return sharing.get_access_log(conn, token)
+
+
+@app.post("/view/{token}/auth")
+def viewer_auth(token: str, body: ViewerAuthRequest, request: Request, conn=Depends(get_conn)):
+    """Authenticate a viewer by email for a shared link."""
+    link = sharing.get_share_link(conn, token)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    viewer = sharing.check_viewer_access(conn, token, body.email)
+    if not viewer:
+        raise HTTPException(403, "You don't have access to this tree. Contact the owner to request access.")
+    ip = request.client.host if request.client else ""
+    sharing.log_access(conn, token, viewer["id"], ip)
+    return {"ok": True, "viewer": viewer, "dataset": link["dataset"]}
+
+
+@app.get("/view/{token}/graph")
+def viewer_graph(token: str, email: str, conn=Depends(get_conn)):
+    """Get graph data for a shared link (requires authorized email)."""
+    link = sharing.get_share_link(conn, token)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    viewer = sharing.check_viewer_access(conn, token, email)
+    if not viewer:
+        raise HTTPException(403, "Access denied")
+    return graph.build_graph(conn, dataset=link["dataset"])
+
+
+@app.get("/view/{token}", response_class=HTMLResponse)
+def viewer_page(token: str, conn=Depends(get_conn)):
+    """Serve the read-only viewer page."""
+    link = sharing.get_share_link(conn, token)
+    if not link:
+        raise HTTPException(404, "Share link not found")
+    viewer_html = Path(__file__).resolve().parent.parent / "web" / "viewer.html"
+    if not viewer_html.exists():
+        raise HTTPException(500, "Viewer page not found")
+    return HTMLResponse(viewer_html.read_text(encoding="utf-8"))
+
+
 @app.get("/api/export/csv")
 def export_csv(conn=Depends(get_conn)):
     """Export current data as legacy CSV format."""
@@ -195,7 +369,7 @@ def export_csv(conn=Depends(get_conn)):
 
     # Collect all edges
     edges = []
-    for rel_type in ["PARENT_OF", "SPOUSE_OF", "SIBLING_OF"]:
+    for rel_type in ["PARENT_OF", "SPOUSE_OF"]:
         result = conn.execute(
             f"MATCH (a:Person)-[r:{rel_type}]->(b:Person) RETURN a.id, b.id"
         )
@@ -225,8 +399,6 @@ def export_csv(conn=Depends(get_conn)):
             writer.writerow([dn2, "Child", dn1, p2["sex"], p2["notes"] or ""])
         elif e["type"] == "SPOUSE_OF":
             writer.writerow([dn1, "Spouse", dn2, "", ""])
-        elif e["type"] == "SIBLING_OF":
-            writer.writerow([dn1, "Sibling", dn2, "", ""])
 
     return Response(
         content=buf.getvalue(), media_type="text/csv",

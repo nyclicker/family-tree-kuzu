@@ -1,0 +1,126 @@
+Person 1,Relation,Person 2,Gender,Details
+Andemariam,Earliest Ancestor,,M,Blata Tekle
+Medhin,Child,Andemariam,F
+Tekle,Child,Andemariam,M,Highlight
+Gebrehiwet,Child,Andemariam,M
+Negusse I,Child,Andemariam,M
+Leteyesus,Child,Andemariam,F
+Letegiorghis,Spouse,Tekle,F
+Tedla,Parent,Letegiorghis,M,Grandma
+Berhane I,Child,Tedla,M
+Tesfay,Child,Tedla,M
+Letay,Child,Tedla,F
+Beyene,Child,Berhane I,M
+Mikiele I,Child,Berhane I,M
+Ghidey,Child,Berhane I,F
+Azieb I,Child,Berhane I,F
+Kebedesh,Child,Berhane I,F
+Elsa,Child,Berhane I,F
+Hiwet,Child,Berhane I,F
+Gebre,Child,Tesfay,M
+Leteberhan,Child,Tesfay,F
+Kidane I,Child,Tesfay,M
+Kahsai,Child,Tesfay,M
+Tsehaye,Child,Letay,M
+Abeba,Child,Letay,F
+Abraha,Child,Negusse I,M
+Roma I,Child,Negusse I,F
+Nigisti I,Child,Negusse I,F
+Dagnew,Child,Negusse I,M
+Tsigeweini,Child,Negusse I,F
+Hansu,Child,Negusse I,F
+Tsehaitu,Child,Negusse I,F
+Mesfin I,Child,Negusse I,M
+Asefaw,Child,Negusse I,M
+Teka,Child,Leteyesus,F
+Mikiele,Child,Leteyesus,M
+Hidega,Child,Medhin,F
+Genet,Child,Medhin,F
+Mebrat,Child,Medhin,F
+Freweini,Child,Medhin,F
+Asefash,Child,Gebrehiwet,F
+Aregash,Child,Gebrehiwet,F
+Tekie,Child,Gebrehiwet,M
+Embaye,Child,Gebrehiwet,F
+Roma,Child,Gebrehiwet,F
+Kiros,Child,Gebrehiwet,M
+Isaac,Child,Tekle,M
+Zewdi,Child,Tekle,F
+Dimka,Child,Tekle,F
+Sembetu,Child,Tekle,F
+Leterfiel,Child,Tekle,F
+Dehab,Child,Tekle,F
+Letezghi,Spouse,Isaac,F
+Nega,Child,Asefash,M
+Asmeret,Child,Asefash,F
+Yonas3,Child,Asefash,M
+Daniel2,Child,Asefash,M
+Efrem2,Child,Asefash,M
+Aida,Child,Asefash,F
+Tedros2,Child,Aregash,M
+Rut,Child,Aregash,F
+Asghedom,Child,Roma,M
+Emebet,Child,Roma,F
+Yodit,Child,Roma,F
+Serait,Child,Roma,F
+Rahwa (Nini),Child,Roma,F
+Skander,Child,Roma,M
+Alula,Child,Tekie,M
+Zena,Child,Tekie,F
+Fasil2,Child,Tekie,M
+Fiori (Fifi),Child,Embaye,F
+Samrawit,Child,Azieb,F
+Abel,Child,Azieb,M
+Alem,Child,Isaac,M
+Almaz,Child,Isaac,F
+Nigisti,Child,Isaac,F
+Kibrom,Child,Isaac,M
+Yohannes II,Child,Isaac,M
+Simret,Child,Isaac,F
+Mebrat2,Child,Isaac,F
+Ghebrat,Spouse,Zewdi,M
+Dawit,Child,Zewdi,M
+Haile,Child,Zewdi,M
+Tedros,Child,Zewdi,M
+Yohannes I,Child,Zewdi,M
+Iyob,Child,Zewdi,M
+Daniel,Child,Zewdi,M
+Azieb,Child,Zewdi,F
+Helen,Child,Zewdi,F
+Kidane,Spouse,Dimka,M
+Senait,Child,Dimka,F
+Efrem,Child,Dimka,M
+Amanuel,Child,Dimka,M
+Eden,Child,Dimka,M
+Fasil,Child,Dimka,M
+Yonas1,Child,Dimka,M
+Mihret,Child,Dimka,F
+Fitsum,Child,Dimka,M
+Berhane,Child,Dimka,M
+Mesfin,Spouse,Sembetu,M
+Biniam,Child,Sembetu,M
+Mussie,Child,Sembetu,M
+Yosief,Child,Sembetu,M
+Saba,Child,Sembetu,F
+Samuel,Child,Sembetu,M
+Sara,Child,Sembetu,F
+Negusse,Spouse,Leterfiel,M
+Mekonen,Child,Leterfiel,M
+Betlehem,Child,Leterfiel,F
+Yonas2,Child,Leterfiel,M
+Rahel,Child,Leterfiel,F
+Nebiat,Child,Leterfiel,F
+Lidya,Child,Leterfiel,F
+Tuccu,Spouse,Dehab,M
+Aklilu,Child,Dehab,M
+Solomon,Child,Dehab,M
+Selamawit,Child,Dehab,F
+Lulia,Child,Aklilu,F
+Natalia,Child,Aklilu,F
+Sophie,Child,Solomon,F
+Simona,Child,Solomon,F
+Elnathan,Child,Selamawit,M
+Sesina,Child,Selamawit,F
+London,Child,Lidya,M
+Adu (LJ),Child,Lidya,M
+

@@ -26,6 +26,29 @@ def _init_schema(db):
     conn.execute("CREATE REL TABLE IF NOT EXISTS SPOUSE_OF(FROM Person TO Person, id STRING)")
     conn.execute("CREATE REL TABLE IF NOT EXISTS SIBLING_OF(FROM Person TO Person, id STRING)")
 
+    # Sharing: ShareLink → a shareable token for a dataset
+    conn.execute(
+        "CREATE NODE TABLE IF NOT EXISTS ShareLink("
+        "id STRING, dataset STRING, created_at STRING, "
+        "PRIMARY KEY(id))"
+    )
+    # Viewer → someone allowed to view a shared link
+    conn.execute(
+        "CREATE NODE TABLE IF NOT EXISTS Viewer("
+        "id STRING, email STRING, name STRING, "
+        "PRIMARY KEY(id))"
+    )
+    # Access control: which viewers can see which share links
+    conn.execute(
+        "CREATE REL TABLE IF NOT EXISTS CAN_VIEW("
+        "FROM Viewer TO ShareLink, granted_at STRING)"
+    )
+    # Access log: track every time a viewer opens a shared link
+    conn.execute(
+        "CREATE REL TABLE IF NOT EXISTS VIEWED("
+        "FROM Viewer TO ShareLink, id STRING, viewed_at STRING, ip STRING)"
+    )
+
 
 def get_conn():
     db = get_database()

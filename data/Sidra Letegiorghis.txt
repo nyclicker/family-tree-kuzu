@@ -1,0 +1,69 @@
+Person 1,Relation,Person 2,Gender,Details
+Kahsai\n(Kasa),Earliest Ancestor,,M,early ancestor
+Tedla,Child,Kahsai\n(Kasa),M
+Lemlem,Child,Kahsai\n(Kasa),F
+Abrehet,Child,Lemlem,F
+Kidan,Child,Lemlem,F
+Hagosa,Child,Lemlem,F
+Tesfay Negusse,Spouse,Abrehet,M
+Gerghis,Child,Tedla,F,Highlight
+#Gerghis,Spouse,Tekle,F
+Berhane T,Child,Tedla,M
+Tesfay Tedla,Child,Tedla,M
+Letay,Child,Tedla,F
+Beyene B,Child,Berhane T,M
+Michael Berhane,Child,Berhane T,M
+Ghidey B,Child,Berhane T,F
+Azieb B,Child,Berhane T,F
+Kebedesh,Child,Berhane T,F
+Elsa B,Child,Berhane T,F
+Hiwet B,Child,Berhane T,F
+Gebre,Child,Tesfay Tedla,M
+Leteberhan T,Child,Tesfay Tedla,F
+Kidane Tesfay,Child,Tesfay Tedla,M
+Kahsay Tesfay,Child,Tesfay Tedla,M
+Mihret Tesfay,Child,Abrehet,F
+Solomon Tesfay,Child,Abrehet,M
+Tsegay Tesfay,Child,Abrehet,M
+Alganesh Tesfay,Child,Abrehet,F
+Abrahatsion,Child,Abrehet,F
+Tsehaye,Child,Letay,M
+Abeba,Child,Letay,F
+Samrawit,Child,Azieb B,F
+Abel,Child,Azieb B,M
+Aida\n(Mihret),Child,Mihret Tesfay,F
+Seble,Child,Mihret Tesfay,F
+Ezana,Child,Mihret Tesfay,M
+Muzit,Child,Mihret Tesfay,F
+Suzi,Child,Solomon Tesfay,F
+Helen,Child,Solomon Tesfay,F
+Abraha Solomon,Child,Solomon Tesfay,M
+Atsbaha,Child,Solomon Tesfay,M
+Senait S,Child,Solomon Tesfay,F
+# below list from Selam
+Samuel,Child,Tsehaye,M
+Daniel,Child,Tsehaye,M
+Semhar Tsehaye,Child,Tsehaye,F
+Adhanet,Child,Kidane Tesfay,F
+Bisirat,Child,Kidane Tesfay,F
+Medhanie T,Child,Kidane Tesfay,M
+Alem,Child,Leteberhan T,M
+Ruta,Child,Leteberhan T,F
+Awet,Child,Kahsay Tesfay,F
+Semhar,Child,Kahsay Tesfay,F
+Yemane,Child,Gebre,M
+Siem,Child,Elsa B,M
+Yafet\n(Elsa),Child,Elsa B,M
+Naib\n(Elsa),Child,Elsa B,M
+Nahor,Child,Elsa B,M
+Naeb,Child,Elsa B,M
+Senait,Child,Ghidey B,F
+#,Child,Ghidey B,M
+Saron,Child,Ghidey B,M
+Sefanit,Child,Michael Berhane,F
+Shewit,Child,Michael Berhane,F
+Sened,Child,Michael Berhane,F
+Ghenet,Child,Beyene B,F
+Salina,Child,Samrawit,F
+Maher,Child,Samrawit,F
+Haben,Child,Samrawit,M

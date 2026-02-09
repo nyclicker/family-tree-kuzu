@@ -1,0 +1,7 @@
+Person 1,Relation,Person 2,Gender,Details
+Andemariam,Earliest Ancestor,,M,Grandad
+Tekle,Child,Andemariam,M
+Dehab,Child,Tekle,F
+Letegiorghis,Spouse,Tekle,F
+Dupe,Child,Tekle,F
+Dupe2,Child,Dupe,M

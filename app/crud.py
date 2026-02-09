@@ -2,7 +2,7 @@
 import uuid
 import kuzu
 
-VALID_REL_TYPES = {"PARENT_OF", "SPOUSE_OF", "SIBLING_OF"}
+VALID_REL_TYPES = {"PARENT_OF", "SPOUSE_OF"}
 
 
 def _person_from_row(row):
@@ -73,10 +73,14 @@ def delete_person(conn: kuzu.Connection, person_id: str):
 
 
 def delete_relationship(conn: kuzu.Connection, rel_id: str):
-    for rel_type in VALID_REL_TYPES:
-        conn.execute(
-            f"MATCH ()-[r:{rel_type}]->() WHERE r.id = $id DELETE r", {"id": rel_id}
-        )
+    # Include SIBLING_OF for backward compat cleanup of legacy edges
+    for rel_type in ["PARENT_OF", "SPOUSE_OF", "SIBLING_OF"]:
+        try:
+            conn.execute(
+                f"MATCH ()-[r:{rel_type}]->() WHERE r.id = $id DELETE r", {"id": rel_id}
+            )
+        except Exception:
+            pass
 
 
 def find_person_by_name(conn: kuzu.Connection, display_name: str):
@@ -100,6 +104,28 @@ def get_children(conn: kuzu.Connection, person_id: str):
     while result.has_next():
         children.append(_person_from_row(result.get_next()))
     return children
+
+
+def get_parents(conn: kuzu.Connection, person_id: str):
+    """Get all parents of a person (incoming PARENT_OF edges)."""
+    result = conn.execute(
+        "MATCH (parent:Person)-[:PARENT_OF]->(child:Person) WHERE child.id = $id "
+        "RETURN parent.id, parent.display_name, parent.sex, parent.notes",
+        {"id": person_id}
+    )
+    parents = []
+    while result.has_next():
+        parents.append(_person_from_row(result.get_next()))
+    return parents
+
+
+def delete_parent_relationship(conn: kuzu.Connection, parent_id: str, child_id: str):
+    """Delete a specific PARENT_OF edge between parent and child."""
+    conn.execute(
+        "MATCH (a:Person)-[r:PARENT_OF]->(b:Person) "
+        "WHERE a.id = $pid AND b.id = $cid DELETE r",
+        {"pid": parent_id, "cid": child_id}
+    )
 
 
 def _edge_exists(conn: kuzu.Connection, from_id: str, to_id: str, rel_type: str) -> bool:
@@ -222,6 +248,29 @@ def merge_spouse_children(conn: kuzu.Connection, spouse_a_id: str, spouse_b_id: 
         "shared_with_a": shared_with_a,
         "shared_with_b": shared_with_b,
     }
+
+
+def count_parents(conn: kuzu.Connection, person_id: str) -> int:
+    """Count how many parents a person has (incoming PARENT_OF edges)."""
+    result = conn.execute(
+        "MATCH (parent:Person)-[:PARENT_OF]->(child:Person) WHERE child.id = $id RETURN count(*)",
+        {"id": person_id}
+    )
+    if result.has_next():
+        return result.get_next()[0]
+    return 0
+
+
+def count_spouses(conn: kuzu.Connection, person_id: str) -> int:
+    """Count how many spouses a person has (SPOUSE_OF in either direction)."""
+    result = conn.execute(
+        "MATCH (a:Person)-[:SPOUSE_OF]->(b:Person) "
+        "WHERE a.id = $id OR b.id = $id RETURN count(*)",
+        {"id": person_id}
+    )
+    if result.has_next():
+        return result.get_next()[0]
+    return 0
 
 
 def clear_all(conn: kuzu.Connection):

@@ -1,0 +1,11 @@
+Person 1,Relation,Person 2,Gender,Details
+Gebsi,Earliest Ancestor,,M,Founder
+Tearenaizghi,Child,Gebsi,M,
+Kiflizghi,Child,Gebsi,M,
+Tesfazghi,Child,Gebsi,M,
+Andegerghis,Child,Tesfazghi,M
+Tesfit,Child,Andegerghis,M
+Zeru I,Child,Tesfit,M
+Weldeamlak Zeru,Child,Zeru I,M
+Berhane,Child,Weldeamlak Zeru,M
+Gebremeskel WA,Child,Weldeamlak Zeru,M

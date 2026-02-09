@@ -1,0 +1,52 @@
+name,relation,related_to,gender
+Desta,Earliest Ancestor,,F
+Kahsai (Desta),Child,Desta,M
+Letebrhan,Child,Desta,F
+Kudusan (Desta),Child,Desta,F
+Kidisti (Desta),Child,Desta,F
+Ghile,Child,Desta,M
+Embaye Kahsai,Child,Kahsai (Desta),M
+Weini Kahsai,Child,Kahsai (Desta),F
+Haddas,Child,Kahsai (Desta),F
+Hayle,Child,Kahsai (Desta),M
+Tadelesh,Child,Kahsai (Desta),F
+Tesfay K,Child,Kahsai (Desta),M
+Alazar K,Child,Kahsai (Desta),M
+Kudusan K,Child,Kahsai (Desta),F
+Mahlet\n(Letebrhan),Child,Letebrhan,F
+Ghideay\n(Letebrhan),Child,Letebrhan,F
+Ghebremichael\n(Kudusan),Child,Kudusan (Desta),M
+Letenegus\n(Kudusan),Child,Kudusan (Desta),F
+Ghirmay\n(Kidisti),Child,Kidisti (Desta),M
+Roma\n(Kidisti),Child,Kidisti (Desta),F
+Tekie\n(Kidisti),Child,Kidisti (Desta),M
+Bereket\n(Kidisti),Child,Kidisti (Desta),M
+Kidane\n(Kidisti),Child,Kidisti (Desta),M
+Brhane\n(Kidisti),Child,Kidisti (Desta),M
+Fuzum\n(Kidisti),Child,Kidisti (Desta),M
+Tesfamariam G,Child,Ghile,M
+Kidan,Child,Ghile,F
+Habtom,Child,Ghile,M
+Tesfagabr,Child,Ghile,M
+Mehari,Child,Ghile,M
+Tesfaldet,Child,Ghile,M
+Almaz G,Child,Ghile,F
+Hanibal,Child,Tesfamariam G,M
+Meron,Child,Tesfamariam G,M
+Eden\n(Kidan),Child,Kidan,F
+Henok\n(Kidan),Child,Kidan,M
+Betiel\n(Kidan),Child,Kidan,F
+Hermon\n(Kidan),Child,Kidan,M
+Jonathan\n(Tesfagabr),Child,Tesfagabr,M
+Sarah\n(Tesfagabr),Child,Tesfagabr,F
+Joseph\n(Tesfagabr),Child,Tesfagabr,M
+Habtom\n(Tesfaldet),Child,Tesfaldet,M
+Feven\n(Tesfaldet),Child,Tesfaldet,F
+Robel\n(Tesfaldet),Child,Tesfaldet,M
+Adam\n(Tesfaldet),Child,Tesfaldet,M
+Amanuel\n(Almaz),Child,Almaz G,M
+Bana\n(Almaz),Child,Almaz G,F
+Dina\n(Almaz),Child,Almaz G,F
+Abel\n(Almaz),Child,Almaz G,M
+Yeol\n(Almaz),Child,Almaz G,M
+Yonas\n(Almaz),Child,Almaz G,M

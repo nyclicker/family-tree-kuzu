@@ -1,0 +1,26 @@
+Person 1,Relation,Person 2,Gender,Details
+Dirar,Earliest Ancestor,,M,Geza Shilen Adi Nebri (Tedrier)
+Begonay,Child,Dirar,M
+Hawentay,Child,Dirar,M
+Aakhoray,Child,Dirar,M
+Jena Ghebriel,Child,Hawentay,M
+Ghirmay J,Child,Jena Ghebriel,M
+Kifle Ghirmay,Child,Ghirmay J,M
+Medhanie,Child,Kifle Ghirmay,M
+Tesfay Medhanie,Child,Medhanie,M
+Zeweldi,Child,Medhanie,M
+Dawit Medhanie,Child,Medhanie,M
+Weldehilasse,Child,Tesfay Medhanie,M
+Gebrekal,Child,Weldehilasse,M
+Kasa (Kahsai),Child,Gebrekal,M
+Tedla,Child,Kasa (Kahsai),M
+Lemlem,Child,Kasa (Kahsai),F
+#comment out from this line down if combining with Legegerghish tree
+Letegiorghis,Child,Tedla,F
+Berhane T,Child,Tedla,M
+Tesfay Tedla,Child,Tedla,M
+Letay,Child,Tedla,F
+Abrehet,Child,Lemlem,F
+Kidan,Child,Lemlem,F
+Hagosa,Child,Lemlem,F
+#Tesfay Negusse,Spouse,Abrehet,M

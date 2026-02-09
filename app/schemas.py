@@ -15,7 +15,7 @@ class PersonOut(BaseModel):
 class RelCreate(BaseModel):
     from_person_id: str
     to_person_id: str
-    type: Literal["PARENT_OF","SPOUSE_OF","SIBLING_OF"]
+    type: Literal["PARENT_OF","SPOUSE_OF"]
 
 class PersonUpdate(BaseModel):
     display_name: str

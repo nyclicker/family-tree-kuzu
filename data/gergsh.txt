@@ -1,0 +1,7 @@
+Person 1,Relation,Person 2,Gender,Details
+Tedla,Earliest Ancestor,,M,Grandad
+Letegiorghis,Child,Tedla,F
+#Dehab,Child,Letegiorghis,F
+#Tekle,Spouse,Letegiorghis,M
+Berhane,Child,Tedla,M
+Dupe,Child,Tedla,M
