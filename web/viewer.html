@@ -252,6 +252,22 @@
         }
       });
       isolated.forEach(id => { if (!positions[id]) { depth[id] = 0; positions[id] = { x: xOffset, y: 0 }; xOffset += NODE_GAP; } });
+      // Split crowded generations into two staggered sub-rows
+      const CROWD_THRESHOLD = 10, SUB_ROW_OFFSET = RANK_GAP * 0.4;
+      const nodesByDepth = {};
+      for (const id in positions) { const d = depth[id]; if (d === undefined) continue; if (!nodesByDepth[d]) nodesByDepth[d] = []; nodesByDepth[d].push(id); }
+      for (const d in nodesByDepth) {
+        const nodesAtD = nodesByDepth[d];
+        if (nodesAtD.length < CROWD_THRESHOLD) continue;
+        const pGroups = {}; const noPar = [];
+        for (const id of nodesAtD) { const par = parentOf[id]; if (par) { if (!pGroups[par]) pGroups[par] = []; pGroups[par].push(id); } else noPar.push(id); }
+        const sorted = Object.entries(pGroups).sort((a, b) => (positions[a[0]] ? positions[a[0]].x : 0) - (positions[b[0]] ? positions[b[0]].x : 0));
+        let tog = false;
+        for (const [par, kids] of sorted) {
+          if (tog) { for (const kid of kids) { if (positions[kid]) positions[kid].y += SUB_ROW_OFFSET; const desc = getSubtreeIds(kid).slice(1); for (const did of desc) { if (positions[did]) positions[did].y += SUB_ROW_OFFSET; } } }
+          tog = !tog;
+        }
+      }
       cy.nodes().forEach(n => { const p = positions[n.id()]; if (p) n.position(p); });
       cy.fit(40);
     }

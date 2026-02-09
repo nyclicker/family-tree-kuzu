@@ -704,6 +704,57 @@ function runFamilyLayout(animate) {
     }
   });
 
+  // Split crowded generations into two staggered sub-rows
+  const CROWD_THRESHOLD = 10;  // min nodes at a depth to trigger splitting
+  const SUB_ROW_OFFSET = RANK_GAP * 0.4;  // vertical offset for second sub-row
+
+  // Group positioned nodes by depth
+  const nodesByDepth = {};
+  for (const id in positions) {
+    const d = depth[id];
+    if (d === undefined) continue;
+    if (!nodesByDepth[d]) nodesByDepth[d] = [];
+    nodesByDepth[d].push(id);
+  }
+
+  for (const d in nodesByDepth) {
+    const nodesAtDepth = nodesByDepth[d];
+    if (nodesAtDepth.length < CROWD_THRESHOLD) continue;
+
+    // Group nodes by parent to keep siblings together
+    const parentGroups = {};
+    const noParent = [];
+    for (const id of nodesAtDepth) {
+      const par = parentOf[id];
+      if (par) {
+        if (!parentGroups[par]) parentGroups[par] = [];
+        parentGroups[par].push(id);
+      } else {
+        noParent.push(id);
+      }
+    }
+
+    // Sort parent groups by the X position of the parent
+    const sortedGroups = Object.entries(parentGroups)
+      .sort((a, b) => (positions[a[0]] ? positions[a[0]].x : 0) - (positions[b[0]] ? positions[b[0]].x : 0));
+
+    // Alternate parent groups between top sub-row and bottom sub-row
+    let toggle = false;
+    for (const [par, kids] of sortedGroups) {
+      if (toggle) {
+        for (const kid of kids) {
+          if (positions[kid]) positions[kid].y += SUB_ROW_OFFSET;
+          // Also push all descendants of this kid down by the same offset
+          const desc = getSubtreeIds(kid).slice(1);  // exclude kid itself (already shifted)
+          for (const did of desc) {
+            if (positions[did]) positions[did].y += SUB_ROW_OFFSET;
+          }
+        }
+      }
+      toggle = !toggle;
+    }
+  }
+
   // Apply positions
   if (animate) {
     cy.nodes().forEach(n => {
