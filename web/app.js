@@ -183,6 +183,19 @@ function renderDatasetPicker() {
   ).join('');
 }
 
+function highlightActiveDatasets() {
+  const items = document.querySelectorAll('#datasetList .ds-item');
+  const activeNames = (currentDatasetName || '').split(', ').map(n => n.trim().toLowerCase());
+  items.forEach(item => {
+    const span = item.querySelector('span');
+    const name = span ? span.textContent.trim().toLowerCase() : '';
+    const isActive = activeNames.includes(name);
+    item.classList.toggle('active', isActive);
+    const cb = item.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = isActive;
+  });
+}
+
 async function loadSelectedDatasets(combine) {
   const checkboxes = document.querySelectorAll('#datasetList input[type="checkbox"]:checked');
   const files = Array.from(checkboxes).map(cb => cb.value);
@@ -225,7 +238,8 @@ function setDatasetName(name) {
   const el = document.getElementById('datasetInfo');
   if (el) el.textContent = name || 'No data loaded';
   const headerLabel = document.getElementById('datasetLabel');
-  if (headerLabel) headerLabel.textContent = name || '';
+  if (headerLabel) headerLabel.textContent = name ? `— ${name}` : '';
+  highlightActiveDatasets();
   const saveBtn = document.getElementById('saveBtn');
   if (saveBtn) saveBtn.style.display = name ? 'inline-block' : 'none';
   const clearBtn = document.getElementById('clearBtn');
