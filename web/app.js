@@ -450,7 +450,7 @@ async function refresh() {
 function runFamilyLayout(animate) {
   if (!cy || cy.nodes().length === 0) return;
 
-  const NODE_GAP = 90;   // horizontal gap between siblings
+  const NODE_GAP = 140;  // horizontal gap between siblings
   const RANK_GAP = 220;  // vertical gap between generations
   const SPOUSE_GAP = 70;  // offset for spouse nodes
 
@@ -752,6 +752,38 @@ function runFamilyLayout(animate) {
         }
       }
       toggle = !toggle;
+    }
+  }
+
+  // Post-layout: stagger nodes whose labels would still overlap
+  const LABEL_CLEARANCE = 120; // min horizontal px before labels overlap
+  const STAGGER_OFFSET = 35;   // vertical px to offset staggered nodes
+
+  // Group positioned nodes by their Y coordinate
+  const rowBuckets = {};
+  for (const id in positions) {
+    const yKey = Math.round(positions[id].y);
+    if (!rowBuckets[yKey]) rowBuckets[yKey] = [];
+    rowBuckets[yKey].push(id);
+  }
+
+  for (const yKey in rowBuckets) {
+    const row = rowBuckets[yKey];
+    if (row.length < 2) continue;
+    // Sort left-to-right
+    row.sort((a, b) => positions[a].x - positions[b].x);
+    // Walk through adjacent pairs; when too close, stagger alternating nodes down
+    let nudged = false;
+    for (let i = 1; i < row.length; i++) {
+      const gap = positions[row[i]].x - positions[row[i - 1]].x;
+      if (gap < LABEL_CLEARANCE) {
+        nudged = !nudged;
+        if (nudged) {
+          positions[row[i]].y += STAGGER_OFFSET;
+        }
+      } else {
+        nudged = false;
+      }
     }
   }
 
@@ -1492,7 +1524,7 @@ async function loadGraph() {
           'text-valign': 'bottom',
           'text-margin-y': 8,
           'text-wrap': 'wrap',
-          'text-max-width': 120,
+          'text-max-width': 90,
           'font-size': 13,
           'font-weight': 600,
           'color': '#333',
