@@ -1,8 +1,9 @@
 """KuzuDB embedded graph database connection."""
+import os
 import kuzu
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "graph_data"
+DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).resolve().parent.parent / "graph_data"))
 _database = None
 
 
