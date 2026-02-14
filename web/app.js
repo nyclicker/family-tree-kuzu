@@ -3,6 +3,12 @@ let people = [];
 let selectedPersonId = null;
 let currentDatasetName = '';
 
+// Auth & tree state
+let currentUser = null;
+let currentTreeId = null;
+let currentTreeRole = null;
+let userTrees = [];
+
 // Generation-based color palette
 const GEN_COLORS = [
   '#8e44ad', '#2980b9', '#27ae60', '#e67e22', '#e74c3c',
@@ -20,10 +26,258 @@ let layoutDirty = false;
 // Track cursor position on the graph canvas for placing new nodes
 let lastCtxPosition = null;
 
-// ── Data loading ──
+// ── API URL helper ──
+
+function treeApi(path) {
+  return `/api/trees/${currentTreeId}${path}`;
+}
+
+function canEdit() {
+  return currentTreeRole === 'owner' || currentTreeRole === 'editor';
+}
+
+function isOwner() {
+  return currentTreeRole === 'owner';
+}
+
+// ══════════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════════
+
+function showAuthTab(tab) {
+  document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tabLogin').className = 'auth-tab' + (tab === 'login' ? ' active' : '');
+  document.getElementById('tabRegister').className = 'auth-tab' + (tab === 'register' ? ' active' : '');
+  document.getElementById('authError').style.display = 'none';
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/auth/me');
+    if (res.ok) {
+      currentUser = await res.json();
+      showApp();
+      return;
+    }
+  } catch (e) { /* not authenticated */ }
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('userEmail').textContent = currentUser.email;
+  initApp();
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) { showAuthError('Email and password are required'); return; }
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showAuthError(err.detail || 'Login failed');
+      return;
+    }
+    currentUser = await res.json();
+    showApp();
+  } catch (e) {
+    showAuthError('Connection error');
+  }
+}
+
+async function doRegister() {
+  const display_name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const setup_token = document.getElementById('regSetupToken').value.trim();
+  if (!display_name || !email || !password) {
+    showAuthError('All fields are required');
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_name, email, password, setup_token: setup_token || null })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showAuthError(err.detail || 'Registration failed');
+      return;
+    }
+    currentUser = await res.json();
+    showApp();
+  } catch (e) {
+    showAuthError('Connection error');
+  }
+}
+
+async function doLogout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  currentUser = null;
+  currentTreeId = null;
+  currentTreeRole = null;
+  if (cy) { cy.destroy(); cy = null; }
+  showLogin();
+}
+
+// ══════════════════════════════════════════════════════════
+// APP INITIALIZATION
+// ══════════════════════════════════════════════════════════
+
+let appInitialized = false;
+
+function initApp() {
+  if (!appInitialized) {
+    setupDropZone();
+    loadAvailableDatasets();
+    appInitialized = true;
+  }
+  loadTrees();
+}
+
+// ══════════════════════════════════════════════════════════
+// TREE MANAGEMENT
+// ══════════════════════════════════════════════════════════
+
+async function loadTrees() {
+  try {
+    const res = await fetch('/api/trees');
+    if (!res.ok) return;
+    userTrees = await res.json();
+    renderTreeList();
+    // Auto-select if we had a tree selected or there's only one
+    if (currentTreeId) {
+      const found = userTrees.find(t => t.id === currentTreeId);
+      if (found) {
+        selectTree(found.id, found.role);
+        return;
+      }
+    }
+    if (userTrees.length === 1) {
+      selectTree(userTrees[0].id, userTrees[0].role);
+    } else if (userTrees.length === 0) {
+      currentTreeId = null;
+      currentTreeRole = null;
+      updateTreeUI();
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function renderTreeList() {
+  const ul = document.getElementById('treeList');
+  if (userTrees.length === 0) {
+    ul.innerHTML = '<li style="color:#999;padding:8px">No trees yet. Create one to get started.</li>';
+    return;
+  }
+  ul.innerHTML = userTrees.map(t => {
+    const active = t.id === currentTreeId ? ' active' : '';
+    return `<li class="tree-item${active}" onclick="selectTree('${t.id}','${t.role}')">
+      <span class="tree-name">${escapeHtml(t.name)}</span>
+      <span class="tree-role">${t.role}</span>
+    </li>`;
+  }).join('');
+}
+
+function selectTree(treeId, role) {
+  currentTreeId = treeId;
+  currentTreeRole = role;
+  const tree = userTrees.find(t => t.id === treeId);
+  currentDatasetName = tree ? tree.name : '';
+  renderTreeList();
+  updateTreeUI();
+  refresh();
+  if (isOwner()) {
+    loadShares();
+    loadMembers();
+  }
+}
+
+function updateTreeUI() {
+  const hasTree = !!currentTreeId;
+  // Header label
+  const headerLabel = document.getElementById('datasetLabel');
+  if (headerLabel) {
+    const tree = userTrees.find(t => t.id === currentTreeId);
+    headerLabel.textContent = tree ? ` — ${tree.name}` : '';
+  }
+  // Show/hide sections based on tree selection and role
+  const dataSection = document.getElementById('dataSection');
+  const addPersonSection = document.getElementById('addPersonSection');
+  const sharingSection = document.getElementById('sharingSection');
+  const membersSection = document.getElementById('membersSection');
+  const searchSection = document.getElementById('searchSection');
+
+  if (dataSection) dataSection.style.display = hasTree && canEdit() ? 'block' : 'none';
+  if (addPersonSection) addPersonSection.style.display = hasTree && canEdit() ? 'block' : 'none';
+  if (sharingSection) sharingSection.style.display = hasTree && isOwner() ? 'block' : 'none';
+  if (membersSection) membersSection.style.display = hasTree && isOwner() ? 'block' : 'none';
+  if (searchSection) searchSection.style.display = hasTree ? 'block' : 'none';
+
+  // Save/Clear buttons
+  const saveBtn = document.getElementById('saveBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  if (saveBtn) saveBtn.style.display = hasTree ? 'inline-block' : 'none';
+  if (clearBtn) clearBtn.style.display = hasTree && isOwner() ? 'inline-block' : 'none';
+  const combineBtn = document.getElementById('combineBtn');
+  if (combineBtn) combineBtn.style.display = hasTree && canEdit() ? 'inline-block' : 'none';
+}
+
+function openCreateTreeModal() {
+  document.getElementById('newTreeName').value = '';
+  openModal('createTreeModal');
+}
+
+async function createTree() {
+  const name = document.getElementById('newTreeName').value.trim();
+  if (!name) return;
+  try {
+    const res = await fetch('/api/trees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const tree = await res.json();
+    closeModal('createTreeModal');
+    await loadTrees();
+    selectTree(tree.id, 'owner');
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// DATA LOADING
+// ══════════════════════════════════════════════════════════
 
 async function loadPeople() {
-  const res = await fetch('/people');
+  if (!currentTreeId) {
+    people = [];
+    const query = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
+    renderPeopleList(query);
+    return;
+  }
+  const res = await fetch(treeApi('/people'));
   people = await res.json();
   const query = document.getElementById('searchInput') ? document.getElementById('searchInput').value.trim() : '';
   renderPeopleList(query);
@@ -135,12 +389,13 @@ function showStatus(id, message, isError) {
 // ── Sidebar: Add Person ──
 
 async function addPerson() {
+  if (!currentTreeId || !canEdit()) return;
   const name = document.getElementById('personName').value.trim();
   if (!name) { showStatus('personStatus', 'Name is required', true); return; }
   const sex = document.getElementById('personSex').value;
   const notes = document.getElementById('personNotes').value.trim() || null;
   try {
-    const res = await fetch('/people', {
+    const res = await fetch(treeApi('/people'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ display_name: name, sex, notes })
@@ -183,20 +438,8 @@ function renderDatasetPicker() {
   ).join('');
 }
 
-function highlightActiveDatasets() {
-  const items = document.querySelectorAll('#datasetList .ds-item');
-  const activeNames = (currentDatasetName || '').split(', ').map(n => n.trim().toLowerCase());
-  items.forEach(item => {
-    const span = item.querySelector('span');
-    const name = span ? span.textContent.trim().toLowerCase() : '';
-    const isActive = activeNames.includes(name);
-    item.classList.toggle('active', isActive);
-    const cb = item.querySelector('input[type="checkbox"]');
-    if (cb) cb.checked = isActive;
-  });
-}
-
 async function loadSelectedDatasets(combine) {
+  if (!currentTreeId || !canEdit()) return;
   const checkboxes = document.querySelectorAll('#datasetList input[type="checkbox"]:checked');
   const files = Array.from(checkboxes).map(cb => cb.value);
   if (files.length === 0) {
@@ -205,14 +448,13 @@ async function loadSelectedDatasets(combine) {
   }
   showStatus('loadStatus', 'Loading...', false);
   try {
-    const res = await fetch('/api/import/dataset', {
+    const res = await fetch(treeApi('/import/dataset'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ files, combine })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    setDatasetName(data.dataset_name || 'Family Tree');
     showImportReport(data);
     await refresh();
   } catch (e) {
@@ -221,10 +463,10 @@ async function loadSelectedDatasets(combine) {
 }
 
 async function clearData() {
-  if (!confirm('Clear all data from the graph? This cannot be undone.')) return;
+  if (!currentTreeId || !isOwner()) return;
+  if (!confirm('Clear all data from this tree? This cannot be undone.')) return;
   try {
-    await fetch('/api/clear', { method: 'POST' });
-    setDatasetName('');
+    await fetch(treeApi('/clear'), { method: 'POST' });
     document.getElementById('importReportSection').style.display = 'none';
     await refresh();
     showStatus('loadStatus', 'All data cleared', false);
@@ -233,28 +475,10 @@ async function clearData() {
   }
 }
 
-function setDatasetName(name) {
-  currentDatasetName = name;
-  if (name) localStorage.setItem('ft_dataset_name', name);
-  else localStorage.removeItem('ft_dataset_name');
-  const el = document.getElementById('datasetInfo');
-  if (el) el.textContent = name || 'No data loaded';
-  const headerLabel = document.getElementById('datasetLabel');
-  if (headerLabel) headerLabel.textContent = name ? `— ${name}` : '';
-  highlightActiveDatasets();
-  const saveBtn = document.getElementById('saveBtn');
-  if (saveBtn) saveBtn.style.display = name ? 'inline-block' : 'none';
-  const clearBtn = document.getElementById('clearBtn');
-  if (clearBtn) clearBtn.style.display = name ? 'inline-block' : 'none';
-  const combineBtn = document.getElementById('combineBtn');
-  if (combineBtn) combineBtn.style.display = name ? 'inline-block' : 'none';
-  updateSharingSection();
-  if (name) loadShares();
-}
-
 async function saveChanges() {
+  if (!currentTreeId) return;
   try {
-    const res = await fetch('/api/export/csv');
+    const res = await fetch(treeApi('/export/csv'));
     if (!res.ok) throw new Error('Export failed');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -289,10 +513,11 @@ function setupDropZone() {
 function onFileSelected(input) {
   const file = input.files[0];
   if (file) uploadFile(file);
-  input.value = '';  // reset so same file can be re-selected
+  input.value = '';
 }
 
 async function uploadFile(file) {
+  if (!currentTreeId || !canEdit()) return;
   const ext = file.name.split('.').pop().toLowerCase();
   if (!['csv', 'txt', 'db'].includes(ext)) {
     showStatus('loadStatus', `Unsupported file type: .${ext}. Use .csv, .txt, or .db`, true);
@@ -303,11 +528,10 @@ async function uploadFile(file) {
   try {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch('/api/import/upload', { method: 'POST', body: form });
+    const res = await fetch(treeApi('/import/upload'), { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     document.getElementById('dropLabel').textContent = `Loaded: ${file.name}`;
-    setDatasetName(data.dataset_name || file.name.replace(/\.[^.]+$/, ''));
     showImportReport(data);
     await refresh();
   } catch (e) {
@@ -346,7 +570,6 @@ function showImportReport(data) {
       let actions = '';
       if (e.type === 'ambiguous_parent' && e.candidates) {
         actions = `<br><span style="font-size:11px;color:#888">Candidates: ${e.candidates.map(c => escapeHtml(c)).join(', ')}</span>`;
-        // Add a "find in graph" link for each candidate
         actions += '<br>' + e.candidates.map(c => {
           const person = people.find(p => p.display_name === c);
           if (person) {
@@ -394,7 +617,6 @@ function showSpouseMergeReport(data) {
 // ── Helpers ──
 
 function computeGenerations(nodes, edges) {
-  // Build adjacency: parent -> children (PARENT_OF edges: source=parent, target=child)
   const children = {};
   const parents = {};
   const nodeIds = new Set(nodes.map(n => n.data.id));
@@ -405,9 +627,7 @@ function computeGenerations(nodes, edges) {
       parents[e.data.target].push(e.data.source);
     }
   }
-  // Find roots (no parents)
   const roots = [...nodeIds].filter(id => parents[id].length === 0);
-  // BFS from roots
   const gen = {};
   const queue = roots.map(id => { gen[id] = 0; return id; });
   while (queue.length > 0) {
@@ -419,7 +639,6 @@ function computeGenerations(nodes, edges) {
       }
     }
   }
-  // Assign gen 0 to any remaining unassigned nodes
   for (const id of nodeIds) {
     if (!(id in gen)) gen[id] = 0;
   }
@@ -430,7 +649,6 @@ function getPersonById(id) {
   return people.find(p => p.id === id);
 }
 
-// Flash-highlight a newly added node
 function highlightNewNode(nodeId) {
   if (!cy) return;
   const node = cy.getElementById(nodeId);
@@ -450,11 +668,10 @@ async function refresh() {
 function runFamilyLayout(animate) {
   if (!cy || cy.nodes().length === 0) return;
 
-  const NODE_GAP = 140;  // horizontal gap between siblings
-  const RANK_GAP = 220;  // vertical gap between generations
-  const SPOUSE_GAP = 70;  // offset for spouse nodes
+  const NODE_GAP = 140;
+  const RANK_GAP = 220;
+  const SPOUSE_GAP = 70;
 
-  // Build parent-child adjacency from PARENT_OF edges only
   const childrenOf = {};
   const parentOf = {};
   cy.nodes().forEach(n => { childrenOf[n.id()] = []; });
@@ -465,7 +682,6 @@ function runFamilyLayout(animate) {
     }
   });
 
-  // Build spouse pairs
   const spousePairs = [];
   cy.edges().forEach(e => {
     if (e.data('type') === 'SPOUSE_OF') {
@@ -473,7 +689,6 @@ function runFamilyLayout(animate) {
     }
   });
 
-  // Sort children alphabetically for stable layout
   for (const id in childrenOf) {
     childrenOf[id].sort((a, b) => {
       const na = cy.getElementById(a).data('label') || '';
@@ -482,7 +697,6 @@ function runFamilyLayout(animate) {
     });
   }
 
-  // Compute generation depth
   const depth = {};
   function setDepth(id, d) {
     if (depth[id] === undefined || d > depth[id]) {
@@ -491,21 +705,17 @@ function runFamilyLayout(animate) {
     }
   }
 
-  // Find roots (no PARENT_OF edge pointing to them)
   const roots = Object.keys(childrenOf).filter(id => !parentOf[id] && childrenOf[id].length > 0);
-  // Leaf-only nodes with no parent-child edges at all
   const isolated = Object.keys(childrenOf).filter(id => !parentOf[id] && childrenOf[id].length === 0);
 
   roots.forEach(r => setDepth(r, 0));
 
-  // Find which root each node belongs to
   function findRoot(id) {
     let cur = id;
     while (parentOf[cur]) cur = parentOf[cur];
     return cur;
   }
 
-  // Group roots that are connected by spouse edges (union-find)
   const rootGroup = {};
   roots.forEach(r => { rootGroup[r] = r; });
   function findGroup(r) {
@@ -523,7 +733,6 @@ function runFamilyLayout(animate) {
     }
   }
 
-  // Collect root groups in order (largest group first)
   const groups = {};
   roots.forEach(r => {
     const g = findGroup(r);
@@ -543,7 +752,6 @@ function runFamilyLayout(animate) {
     return sb - sa;
   });
 
-  // Position subtree recursively: children first, then center parent
   const positions = {};
   function positionSubtree(id, xStart) {
     const kids = childrenOf[id];
@@ -555,14 +763,12 @@ function runFamilyLayout(animate) {
     for (const kid of kids) {
       x = positionSubtree(kid, x);
     }
-    // Center parent over its children
     const firstX = positions[kids[0]].x;
     const lastX = positions[kids[kids.length - 1]].x;
     positions[id] = { x: (firstX + lastX) / 2, y: (depth[id] || 0) * RANK_GAP };
     return x;
   }
 
-  // Collect all node IDs in a subtree
   function getSubtreeIds(rootId) {
     const ids = [rootId];
     const queue = [rootId];
@@ -576,21 +782,17 @@ function runFamilyLayout(animate) {
     return ids;
   }
 
-  // Position each group of spouse-connected trees together
   let xOffset = 0;
-  const positionedSoFar = new Set();  // track node IDs already placed
+  const positionedSoFar = new Set();
 
   for (const group of groupList) {
-    // Position first (largest) tree in the group
     xOffset = positionSubtree(group[0], xOffset);
     getSubtreeIds(group[0]).forEach(id => positionedSoFar.add(id));
 
-    // Position remaining trees in this group, aligning spouses
     for (let i = 1; i < group.length; i++) {
       const root = group[i];
       const treeIds = getSubtreeIds(root);
 
-      // Find if any node in this tree has a spouse in an already-positioned tree
       let spouseAnchor = null;
       for (const [s, t] of spousePairs) {
         if (treeIds.includes(s) && positions[t]) {
@@ -603,10 +805,8 @@ function runFamilyLayout(animate) {
         }
       }
 
-      // Position this tree starting after current content
       positionSubtree(root, xOffset + NODE_GAP);
 
-      // If we found a spouse link, shift this tree so spouses are adjacent
       if (spouseAnchor && positions[spouseAnchor.thisNode] && positions[spouseAnchor.otherNode]) {
         const targetX = positions[spouseAnchor.otherNode].x + SPOUSE_GAP;
         const currentX = positions[spouseAnchor.thisNode].x;
@@ -614,7 +814,6 @@ function runFamilyLayout(animate) {
         const targetDepth = depth[spouseAnchor.otherNode] || 0;
         const currentDepth = depth[spouseAnchor.thisNode] || 0;
         const depthShift = targetDepth - currentDepth;
-        // Shift all nodes in this tree
         for (const id of treeIds) {
           if (positions[id]) {
             positions[id].x += shiftX;
@@ -623,7 +822,6 @@ function runFamilyLayout(animate) {
           if (depth[id] !== undefined) depth[id] += depthShift;
         }
 
-        // Resolve overlaps: check if shifted tree nodes collide with existing nodes
         function detectOverlap(treeNodeIds) {
           const occupiedByY = {};
           for (const eid of positionedSoFar) {
@@ -647,12 +845,9 @@ function runFamilyLayout(animate) {
           return maxOvl;
         }
 
-        // Strategy 1: Push descendants (not the anchor) down one generation
-        // This keeps the couple side by side but staggers their subtrees vertically
         const anchorId = spouseAnchor.thisNode;
         let hasOverlap = detectOverlap(treeIds) > 0;
         if (hasOverlap) {
-          // Push all nodes except the spouse anchor down by one RANK_GAP
           for (const id of treeIds) {
             if (id === anchorId) continue;
             if (positions[id]) positions[id].y += RANK_GAP;
@@ -660,7 +855,6 @@ function runFamilyLayout(animate) {
           }
         }
 
-        // Strategy 2: If still overlapping after push-down, push right
         const remainingOverlap = detectOverlap(treeIds);
         if (remainingOverlap > 0) {
           for (const id of treeIds) {
@@ -669,7 +863,6 @@ function runFamilyLayout(animate) {
         }
       }
 
-      // Track these nodes and update xOffset
       treeIds.forEach(id => positionedSoFar.add(id));
       let maxX = xOffset;
       for (const id of treeIds) {
@@ -681,7 +874,6 @@ function runFamilyLayout(animate) {
     xOffset += NODE_GAP;
   }
 
-  // Place spouse-connected nodes that aren't part of any tree (isolated spouses)
   cy.edges().forEach(e => {
     if (e.data('type') === 'SPOUSE_OF') {
       const s = e.data('source'), t = e.data('target');
@@ -695,7 +887,6 @@ function runFamilyLayout(animate) {
     }
   });
 
-  // Any remaining unpositioned nodes (isolated)
   isolated.forEach(id => {
     if (!positions[id]) {
       depth[id] = 0;
@@ -704,11 +895,10 @@ function runFamilyLayout(animate) {
     }
   });
 
-  // Split crowded generations into two staggered sub-rows
-  const CROWD_THRESHOLD = 10;  // min nodes at a depth to trigger splitting
-  const SUB_ROW_OFFSET = RANK_GAP * 0.4;  // vertical offset for second sub-row
+  // Split crowded generations
+  const CROWD_THRESHOLD = 10;
+  const SUB_ROW_OFFSET = RANK_GAP * 0.4;
 
-  // Group positioned nodes by depth
   const nodesByDepth = {};
   for (const id in positions) {
     const d = depth[id];
@@ -721,7 +911,6 @@ function runFamilyLayout(animate) {
     const nodesAtDepth = nodesByDepth[d];
     if (nodesAtDepth.length < CROWD_THRESHOLD) continue;
 
-    // Group nodes by parent to keep siblings together
     const parentGroups = {};
     const noParent = [];
     for (const id of nodesAtDepth) {
@@ -734,18 +923,15 @@ function runFamilyLayout(animate) {
       }
     }
 
-    // Sort parent groups by the X position of the parent
     const sortedGroups = Object.entries(parentGroups)
       .sort((a, b) => (positions[a[0]] ? positions[a[0]].x : 0) - (positions[b[0]] ? positions[b[0]].x : 0));
 
-    // Alternate parent groups between top sub-row and bottom sub-row
     let toggle = false;
     for (const [par, kids] of sortedGroups) {
       if (toggle) {
         for (const kid of kids) {
           if (positions[kid]) positions[kid].y += SUB_ROW_OFFSET;
-          // Also push all descendants of this kid down by the same offset
-          const desc = getSubtreeIds(kid).slice(1);  // exclude kid itself (already shifted)
+          const desc = getSubtreeIds(kid).slice(1);
           for (const did of desc) {
             if (positions[did]) positions[did].y += SUB_ROW_OFFSET;
           }
@@ -755,11 +941,10 @@ function runFamilyLayout(animate) {
     }
   }
 
-  // Post-layout: stagger nodes whose labels would still overlap
-  const LABEL_CLEARANCE = 120; // min horizontal px before labels overlap
-  const STAGGER_OFFSET = 35;   // vertical px to offset staggered nodes
+  // Post-layout: stagger overlapping labels
+  const LABEL_CLEARANCE = 120;
+  const STAGGER_OFFSET = 35;
 
-  // Group positioned nodes by their Y coordinate
   const rowBuckets = {};
   for (const id in positions) {
     const yKey = Math.round(positions[id].y);
@@ -770,9 +955,7 @@ function runFamilyLayout(animate) {
   for (const yKey in rowBuckets) {
     const row = rowBuckets[yKey];
     if (row.length < 2) continue;
-    // Sort left-to-right
     row.sort((a, b) => positions[a].x - positions[b].x);
-    // Walk through adjacent pairs; when too close, stagger alternating nodes down
     let nudged = false;
     for (let i = 1; i < row.length; i++) {
       const gap = positions[row[i]].x - positions[row[i - 1]].x;
@@ -848,7 +1031,7 @@ document.addEventListener('click', hideAllMenus);
 
 function ctxEditPerson() {
   hideAllMenus();
-  if (!ctxTargetNode) return;
+  if (!ctxTargetNode || !canEdit()) return;
   const id = ctxTargetNode.data('id');
   const person = getPersonById(id);
   if (!person) return;
@@ -861,13 +1044,14 @@ function ctxEditPerson() {
 }
 
 async function saveEditPerson() {
+  if (!currentTreeId || !canEdit()) return;
   const id = document.getElementById('editPersonId').value;
   const display_name = document.getElementById('editPersonName').value.trim();
   const sex = document.getElementById('editPersonSex').value;
   const notes = document.getElementById('editPersonNotes').value.trim() || null;
   if (!display_name) return;
   try {
-    const res = await fetch(`/people/${id}`, {
+    const res = await fetch(treeApi(`/people/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ display_name, sex, notes })
@@ -882,12 +1066,12 @@ async function saveEditPerson() {
 
 async function ctxDeletePerson() {
   hideAllMenus();
-  if (!ctxTargetNode) return;
+  if (!ctxTargetNode || !canEdit()) return;
   const id = ctxTargetNode.data('id');
   const label = ctxTargetNode.data('label');
   if (!confirm(`Delete "${label}" and all their relationships?`)) return;
   try {
-    const res = await fetch(`/people/${id}`, { method: 'DELETE' });
+    const res = await fetch(treeApi(`/people/${id}`), { method: 'DELETE' });
     if (!res.ok) throw new Error(await res.text());
     await refresh();
   } catch (e) {
@@ -897,7 +1081,7 @@ async function ctxDeletePerson() {
 
 function ctxAddChild() {
   hideAllMenus();
-  if (!ctxTargetNode) return;
+  if (!ctxTargetNode || !canEdit()) return;
   const parentId = ctxTargetNode.data('id');
   const parentLabel = ctxTargetNode.data('label');
   document.getElementById('addChildParentId').value = parentId;
@@ -909,22 +1093,21 @@ function ctxAddChild() {
 }
 
 async function saveAddChild() {
+  if (!currentTreeId || !canEdit()) return;
   const parentId = document.getElementById('addChildParentId').value;
   const name = document.getElementById('addChildName').value.trim();
   if (!name) return;
   const sex = document.getElementById('addChildSex').value;
   const notes = document.getElementById('addChildNotes').value.trim() || null;
   try {
-    // Create the child person
-    const res = await fetch('/people', {
+    const res = await fetch(treeApi('/people'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ display_name: name, sex, notes })
     });
     if (!res.ok) throw new Error(await res.text());
     const child = await res.json();
-    // Create PARENT_OF relationship
-    const relRes = await fetch('/relationships', {
+    const relRes = await fetch(treeApi('/relationships'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from_person_id: parentId, to_person_id: child.id, type: 'PARENT_OF' })
@@ -940,7 +1123,7 @@ async function saveAddChild() {
 
 // ── Context Menu: Add Parent ──
 
-let parentMode = 'new';  // 'new' or 'existing'
+let parentMode = 'new';
 
 function setParentMode(mode) {
   parentMode = mode;
@@ -971,13 +1154,12 @@ function onParentSearchInput() {
 
 async function ctxAddParent() {
   hideAllMenus();
-  if (!ctxTargetNode) return;
+  if (!ctxTargetNode || !canEdit()) return;
   const childId = ctxTargetNode.data('id');
   const childLabel = ctxTargetNode.data('label');
-  // Check if already has a parent
   let existingParents = [];
   try {
-    const res = await fetch(`/people/${childId}/parents`);
+    const res = await fetch(treeApi(`/people/${childId}/parents`));
     existingParents = await res.json();
   } catch (e) { /* proceed */ }
 
@@ -1004,8 +1186,8 @@ async function ctxAddParent() {
 }
 
 async function saveAddParent() {
+  if (!currentTreeId || !canEdit()) return;
   const childId = document.getElementById('addParentChildId').value;
-  // Build request body based on mode
   let body;
   if (parentMode === 'existing') {
     const selectedId = document.getElementById('parentExistingSelect').value;
@@ -1021,7 +1203,7 @@ async function saveAddParent() {
     };
   }
   try {
-    const res = await fetch(`/people/${childId}/set-parent`, {
+    const res = await fetch(treeApi(`/people/${childId}/set-parent`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -1041,7 +1223,7 @@ async function saveAddParent() {
 
 // ── Context Menu: Add Spouse ──
 
-let spouseMode = 'new';  // 'new' or 'existing'
+let spouseMode = 'new';
 
 function setSpouseMode(mode) {
   spouseMode = mode;
@@ -1072,12 +1254,11 @@ function onSpouseSearchInput() {
 
 async function ctxAddSpouse() {
   hideAllMenus();
-  if (!ctxTargetNode) return;
+  if (!ctxTargetNode || !canEdit()) return;
   const personId = ctxTargetNode.data('id');
   const personLabel = ctxTargetNode.data('label');
-  // Check spouse count
   try {
-    const res = await fetch(`/people/${personId}/relationship-counts`);
+    const res = await fetch(treeApi(`/people/${personId}/relationship-counts`));
     const counts = await res.json();
     if (counts.spouses >= 1) {
       alert(`"${personLabel}" already has a spouse. Remove the existing spouse relationship first.`);
@@ -1088,7 +1269,6 @@ async function ctxAddSpouse() {
   document.getElementById('addSpouseModalTitle').textContent = `Add Spouse of ${personLabel}`;
   document.getElementById('addSpouseName').value = '';
   document.getElementById('addSpouseNotes').value = '';
-  // Default to opposite sex of the person
   const person = getPersonById(personId);
   document.getElementById('addSpouseSex').value = person && person.sex === 'M' ? 'F' : 'M';
   setSpouseMode('new');
@@ -1096,6 +1276,7 @@ async function ctxAddSpouse() {
 }
 
 async function saveAddSpouse() {
+  if (!currentTreeId || !canEdit()) return;
   const personId = document.getElementById('addSpousePersonId').value;
   let spouseId;
   try {
@@ -1108,7 +1289,7 @@ async function saveAddSpouse() {
       if (!name) { alert('Enter a name'); return; }
       const sex = document.getElementById('addSpouseSex').value;
       const notes = document.getElementById('addSpouseNotes').value.trim() || null;
-      const res = await fetch('/people', {
+      const res = await fetch(treeApi('/people'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ display_name: name, sex, notes })
@@ -1117,14 +1298,13 @@ async function saveAddSpouse() {
       const spouse = await res.json();
       spouseId = spouse.id;
     }
-    const relRes = await fetch('/relationships', {
+    const relRes = await fetch(treeApi('/relationships'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from_person_id: personId, to_person_id: spouseId, type: 'SPOUSE_OF' })
     });
     if (!relRes.ok) {
-      // Only delete if we just created a new person
-      if (spouseMode === 'new') await fetch(`/people/${spouseId}`, { method: 'DELETE' });
+      if (spouseMode === 'new') await fetch(treeApi(`/people/${spouseId}`), { method: 'DELETE' });
       throw new Error(await relRes.text());
     }
     const data = await relRes.json();
@@ -1137,16 +1317,15 @@ async function saveAddSpouse() {
   }
 }
 
-// ── Context Menu: Add Sibling (= child of same parents) ──
+// ── Context Menu: Add Sibling ──
 
 async function ctxAddSibling() {
   hideAllMenus();
-  if (!ctxTargetNode) return;
+  if (!ctxTargetNode || !canEdit()) return;
   const personId = ctxTargetNode.data('id');
   const personLabel = ctxTargetNode.data('label');
-  // Check if the person has parents — siblings must share parents
   try {
-    const res = await fetch(`/people/${personId}/parents`);
+    const res = await fetch(treeApi(`/people/${personId}/parents`));
     const parents = await res.json();
     if (parents.length === 0) {
       alert(`"${personLabel}" has no parents. Add a parent first, then add siblings.`);
@@ -1162,36 +1341,34 @@ async function ctxAddSibling() {
 }
 
 async function saveAddSibling() {
+  if (!currentTreeId || !canEdit()) return;
   const personId = document.getElementById('addSiblingPersonId').value;
   const name = document.getElementById('addSiblingName').value.trim();
   if (!name) return;
   const sex = document.getElementById('addSiblingSex').value;
   const notes = document.getElementById('addSiblingNotes').value.trim() || null;
   try {
-    // Get the target person's parents
-    const parentsRes = await fetch(`/people/${personId}/parents`);
+    const parentsRes = await fetch(treeApi(`/people/${personId}/parents`));
     const parents = await parentsRes.json();
     if (parents.length === 0) {
       alert('This person has no parents. Add a parent first.');
       return;
     }
-    // Create the sibling person
-    const res = await fetch('/people', {
+    const res = await fetch(treeApi('/people'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ display_name: name, sex, notes })
     });
     if (!res.ok) throw new Error(await res.text());
     const sibling = await res.json();
-    // Add PARENT_OF from each parent to the new sibling
     for (const parent of parents) {
-      const relRes = await fetch('/relationships', {
+      const relRes = await fetch(treeApi('/relationships'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from_person_id: parent.id, to_person_id: sibling.id, type: 'PARENT_OF' })
       });
       if (!relRes.ok) {
-        await fetch(`/people/${sibling.id}`, { method: 'DELETE' });
+        await fetch(treeApi(`/people/${sibling.id}`), { method: 'DELETE' });
         throw new Error(await relRes.text());
       }
     }
@@ -1208,11 +1385,11 @@ async function saveAddSibling() {
 
 async function ctxDeleteRelationship() {
   hideAllMenus();
-  if (!ctxTargetEdge) return;
+  if (!ctxTargetEdge || !canEdit()) return;
   const id = ctxTargetEdge.data('id');
   if (!confirm('Delete this relationship?')) return;
   try {
-    const res = await fetch(`/relationships/${id}`, { method: 'DELETE' });
+    const res = await fetch(treeApi(`/relationships/${id}`), { method: 'DELETE' });
     if (!res.ok) throw new Error(await res.text());
     await refresh();
   } catch (e) {
@@ -1224,6 +1401,7 @@ async function ctxDeleteRelationship() {
 
 function ctxAddPersonHere() {
   hideAllMenus();
+  if (!canEdit()) return;
   document.getElementById('modalPersonName').value = '';
   document.getElementById('modalPersonSex').value = 'M';
   document.getElementById('modalPersonNotes').value = '';
@@ -1231,13 +1409,14 @@ function ctxAddPersonHere() {
 }
 
 async function saveModalPerson() {
+  if (!currentTreeId || !canEdit()) return;
   const name = document.getElementById('modalPersonName').value.trim();
   if (!name) return;
   const sex = document.getElementById('modalPersonSex').value;
   const notes = document.getElementById('modalPersonNotes').value.trim() || null;
   const placementPos = lastCtxPosition;
   try {
-    const res = await fetch('/people', {
+    const res = await fetch(treeApi('/people'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ display_name: name, sex, notes })
@@ -1246,7 +1425,6 @@ async function saveModalPerson() {
     const newPerson = await res.json();
     closeModal('addPersonModal');
     await refresh();
-    // Place at cursor position and highlight
     if (cy && placementPos) {
       const node = cy.getElementById(newPerson.id);
       if (node && node.nonempty()) {
@@ -1259,13 +1437,16 @@ async function saveModalPerson() {
   }
 }
 
-// ── Sharing ──
+// ══════════════════════════════════════════════════════════
+// SHARING (tree-scoped)
+// ══════════════════════════════════════════════════════════
 
 let activeShareToken = null;
 
 async function loadShares() {
+  if (!currentTreeId || !isOwner()) return;
   try {
-    const res = await fetch('/api/shares');
+    const res = await fetch(treeApi('/shares'));
     const shares = await res.json();
     renderShareLinks(shares);
   } catch (e) { /* ignore */ }
@@ -1281,7 +1462,7 @@ function renderShareLinks(shares) {
     const viewerCount = s.viewers ? s.viewers.length : 0;
     const active = s.token === activeShareToken ? ' style="background:#ebf5fb;border-left:3px solid #3498db;padding-left:5px"' : '';
     return `<div${active} style="padding:6px 0;font-size:13px;border-bottom:1px solid #eee;cursor:pointer" onclick="selectShare('${s.token}')">
-      <strong>${escapeHtml(s.dataset)}</strong>
+      <strong>${escapeHtml(s.dataset || s.tree_id || '')}</strong>
       <span style="color:#999;font-size:11px">${viewerCount} viewer(s)</span>
       <span onclick="event.stopPropagation();deleteShare('${s.token}')" style="float:right;color:#e74c3c;cursor:pointer;font-size:11px" title="Delete">&#10005;</span>
     </div>`;
@@ -1289,12 +1470,9 @@ function renderShareLinks(shares) {
 }
 
 async function createShareLink() {
-  if (!currentDatasetName) {
-    alert('Load a dataset first');
-    return;
-  }
+  if (!currentTreeId || !isOwner()) return;
   try {
-    const res = await fetch('/api/shares', {
+    const res = await fetch(treeApi('/shares'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dataset: currentDatasetName })
@@ -1311,7 +1489,7 @@ async function createShareLink() {
 async function deleteShare(token) {
   if (!confirm('Delete this share link? All viewers will lose access.')) return;
   try {
-    await fetch(`/api/shares/${token}`, { method: 'DELETE' });
+    await fetch(treeApi(`/shares/${token}`), { method: 'DELETE' });
     if (activeShareToken === token) {
       activeShareToken = null;
       document.getElementById('shareDetail').style.display = 'none';
@@ -1344,7 +1522,7 @@ function copyShareLink() {
 
 async function loadViewers(token) {
   try {
-    const res = await fetch(`/api/shares/${token}/viewers`);
+    const res = await fetch(treeApi(`/shares/${token}/viewers`));
     const viewers = await res.json();
     const ul = document.getElementById('viewerList');
     if (viewers.length === 0) {
@@ -1361,11 +1539,11 @@ async function loadViewers(token) {
 }
 
 async function addViewer() {
-  if (!activeShareToken) return;
+  if (!activeShareToken || !currentTreeId) return;
   const email = document.getElementById('viewerEmail').value.trim();
   if (!email) return;
   try {
-    const res = await fetch(`/api/shares/${activeShareToken}/viewers`, {
+    const res = await fetch(treeApi(`/shares/${activeShareToken}/viewers`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
@@ -1381,7 +1559,7 @@ async function addViewer() {
 
 async function removeViewer(token, viewerId) {
   try {
-    await fetch(`/api/shares/${token}/viewers/${viewerId}`, { method: 'DELETE' });
+    await fetch(treeApi(`/shares/${token}/viewers/${viewerId}`), { method: 'DELETE' });
     await loadViewers(token);
     await loadShares();
   } catch (e) {
@@ -1391,7 +1569,7 @@ async function removeViewer(token, viewerId) {
 
 async function loadAccessLog(token) {
   try {
-    const res = await fetch(`/api/shares/${token}/access-log`);
+    const res = await fetch(treeApi(`/shares/${token}/access-log`));
     const logs = await res.json();
     const ul = document.getElementById('accessLog');
     if (logs.length === 0) {
@@ -1405,9 +1583,125 @@ async function loadAccessLog(token) {
   } catch (e) { /* ignore */ }
 }
 
-function updateSharingSection() {
-  const section = document.getElementById('sharingSection');
-  if (section) section.style.display = currentDatasetName ? 'block' : 'none';
+// ══════════════════════════════════════════════════════════
+// TREE MEMBERS (owner only)
+// ══════════════════════════════════════════════════════════
+
+async function loadMembers() {
+  if (!currentTreeId || !isOwner()) return;
+  try {
+    const res = await fetch(treeApi('/members'));
+    if (!res.ok) return;
+    const data = await res.json();
+    renderMembers(data);
+  } catch (e) { /* ignore */ }
+}
+
+function renderMembers(data) {
+  const el = document.getElementById('membersList');
+  let html = '';
+
+  // Owner
+  if (data.owner) {
+    html += `<div class="member-item">
+      <div class="member-info">
+        <div class="member-email">${escapeHtml(data.owner.email)}</div>
+        <div class="member-role">Owner</div>
+      </div>
+    </div>`;
+  }
+
+  // Direct users
+  for (const u of (data.users || [])) {
+    html += `<div class="member-item">
+      <div class="member-info">
+        <div class="member-email">${escapeHtml(u.email)}</div>
+        <div class="member-role">${u.display_name ? escapeHtml(u.display_name) + ' — ' : ''}${u.role}</div>
+      </div>
+      <div class="member-actions">
+        <select onchange="updateMemberRole('${u.id}', this.value)">
+          <option value="viewer"${u.role === 'viewer' ? ' selected' : ''}>Viewer</option>
+          <option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option>
+        </select>
+        <span onclick="removeMember('${u.id}')" style="color:#e74c3c;cursor:pointer;font-size:11px" title="Remove">&#10005;</span>
+      </div>
+    </div>`;
+  }
+
+  // Groups
+  for (const g of (data.groups || [])) {
+    html += `<div class="member-item">
+      <div class="member-info">
+        <div class="member-email">[Group] ${escapeHtml(g.name)}</div>
+        <div class="member-role">${g.role}</div>
+      </div>
+      <div class="member-actions">
+        <span onclick="removeGroupAccess('${g.id}')" style="color:#e74c3c;cursor:pointer;font-size:11px" title="Remove">&#10005;</span>
+      </div>
+    </div>`;
+  }
+
+  if (!html) {
+    html = '<div style="font-size:13px;color:#999">No members yet</div>';
+  }
+  el.innerHTML = html;
+}
+
+async function addTreeMember() {
+  if (!currentTreeId || !isOwner()) return;
+  const email = document.getElementById('memberEmail').value.trim();
+  const role = document.getElementById('memberRole').value;
+  if (!email) return;
+  try {
+    const res = await fetch(treeApi('/members'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, role })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.detail || 'Failed to add member');
+      return;
+    }
+    document.getElementById('memberEmail').value = '';
+    await loadMembers();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function updateMemberRole(userId, role) {
+  if (!currentTreeId || !isOwner()) return;
+  try {
+    await fetch(treeApi(`/members/${userId}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role })
+    });
+    await loadMembers();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function removeMember(userId) {
+  if (!confirm('Remove this member?')) return;
+  try {
+    await fetch(treeApi(`/members/${userId}`), { method: 'DELETE' });
+    await loadMembers();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function removeGroupAccess(groupId) {
+  if (!confirm('Remove group access?')) return;
+  try {
+    await fetch(treeApi(`/groups/${groupId}`), { method: 'DELETE' });
+    await loadMembers();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 // ── Export graph as image ──
@@ -1447,7 +1741,15 @@ function updateExportButtons(hasNodes) {
 // ── Graph rendering ──
 
 async function loadGraph() {
-  const res = await fetch('/graph');
+  if (!currentTreeId) {
+    const emptyState = document.getElementById('emptyState');
+    if (emptyState) emptyState.style.display = 'flex';
+    updateExportButtons(false);
+    if (cy) { cy.destroy(); cy = null; }
+    return;
+  }
+
+  const res = await fetch(treeApi('/graph'));
   const data = await res.json();
   const emptyState = document.getElementById('emptyState');
   const resetBtn = document.getElementById('resetBtn');
@@ -1473,7 +1775,6 @@ async function loadGraph() {
     elements.push({ data: { id: n.data.id, label: n.data.label, gen, color } });
   });
 
-  // Build spouse lookup to detect married couples
   const spouseOf = {};
   data.edges.forEach(e => {
     if (e.data.type === 'SPOUSE_OF') {
@@ -1482,7 +1783,6 @@ async function loadGraph() {
     }
   });
 
-  // For children with two married parents, only show one PARENT_OF edge
   const parentEdges = data.edges.filter(e => e.data.type === 'PARENT_OF');
   const skipEdges = new Set();
   const childParents = {};
@@ -1496,8 +1796,6 @@ async function loadGraph() {
     if (edges.length === 2) {
       const p1 = edges[0].data.source, p2 = edges[1].data.source;
       if (spouseOf[p1] === p2) {
-        // Skip the edge from the spouse who is NOT the primary tree parent
-        // Keep the edge from whichever parent has more connections in the tree
         skipEdges.add(edges[1].data.id);
       }
     }
@@ -1607,25 +1905,25 @@ async function loadGraph() {
         }
       }
     ],
-    layout: { name: 'preset' },  // we run layout manually below
+    layout: { name: 'preset' },
     minZoom: 0.2,
     maxZoom: 3,
     wheelSensitivity: 0.3
   });
 
-  // Run custom parent-centered layout (siblings always grouped under parent)
   runFamilyLayout(false);
   updateExportButtons(true);
 
-  // Show reset button when a node is dragged
   cy.on('dragfree', 'node', onNodeDrag);
 
-  // Context menu events
+  // Context menu events — only show edit actions if user can edit
   cy.on('cxttap', 'node', async function(evt) {
     evt.originalEvent.preventDefault();
     ctxTargetNode = evt.target;
     ctxTargetEdge = null;
-    // Fetch relationship counts to enable/disable menu items
+
+    if (!canEdit()) return; // Don't show context menu for viewers
+
     const parentItem = document.getElementById('ctxAddParentItem');
     const spouseItem = document.getElementById('ctxAddSpouseItem');
     const siblingItem = document.getElementById('ctxAddSiblingItem');
@@ -1634,7 +1932,7 @@ async function loadGraph() {
     spouseItem.className = 'ctx-item';
     siblingItem.className = 'ctx-item';
     try {
-      const res = await fetch(`/people/${evt.target.data('id')}/relationship-counts`);
+      const res = await fetch(treeApi(`/people/${evt.target.data('id')}/relationship-counts`));
       const counts = await res.json();
       if (counts.parents >= 1) {
         parentItem.innerHTML = '<span class="ctx-icon">&#x1F504;</span> Replace Parent';
@@ -1649,6 +1947,7 @@ async function loadGraph() {
   });
 
   cy.on('cxttap', 'edge', function(evt) {
+    if (!canEdit()) return;
     evt.originalEvent.preventDefault();
     ctxTargetEdge = evt.target;
     ctxTargetNode = null;
@@ -1657,15 +1956,15 @@ async function loadGraph() {
 
   cy.on('cxttap', function(evt) {
     if (evt.target === cy) {
+      if (!canEdit()) return;
       evt.originalEvent.preventDefault();
       ctxTargetNode = null;
       ctxTargetEdge = null;
-      lastCtxPosition = evt.position;  // graph-space coords for placing new node
+      lastCtxPosition = evt.position;
       showMenu('ctxBg', evt.originalEvent.clientX, evt.originalEvent.clientY);
     }
   });
 
-  // Double-click node to edit
   cy.on('dbltap', 'node', function(evt) {
     ctxTargetNode = evt.target;
     ctxEditPerson();
@@ -1674,12 +1973,4 @@ async function loadGraph() {
 
 // ── Initialize ──
 
-setupDropZone();
-loadAvailableDatasets();
-loadPeople().then(async () => {
-  await loadGraph();
-  if (people.length > 0) {
-    const savedName = localStorage.getItem('ft_dataset_name');
-    setDatasetName(savedName || 'Family Tree');
-  }
-});
+checkAuth();

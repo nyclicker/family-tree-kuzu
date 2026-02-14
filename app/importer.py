@@ -83,7 +83,7 @@ def detect_and_resolve_duplicates(rows: list[dict]):
 
 
 def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
-                    clear_first: bool = True) -> dict:
+                    clear_first: bool = True, tree_id: str = "") -> dict:
     """Import legacy CSV text with smart duplicate resolution."""
     rows = parse_csv_rows(text)
     if not rows:
@@ -91,7 +91,7 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
                 "errors": [{"line": 0, "type": "empty", "message": "No data rows found"}]}
 
     if clear_first:
-        crud.clear_all(conn)
+        crud.clear_all(conn, tree_id=tree_id)
 
     rename_map, ambiguous_versions, auto_fixes, errors = detect_and_resolve_duplicates(rows)
     person_registry = {}  # display_name -> {"id": ..., "sex": ..., "notes": ...}
@@ -122,11 +122,11 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
                 )
             return p
         # Cross-file dedup: check if person already exists in DB from a previous file
-        existing = crud.find_person_by_name(conn, display_name)
+        existing = crud.find_person_by_name(conn, display_name, tree_id=tree_id)
         if existing:
             person_registry[display_name] = existing
             return existing
-        p = crud.create_person(conn, display_name, sex, notes, dataset)
+        p = crud.create_person(conn, display_name, sex, notes, dataset, tree_id=tree_id)
         person_registry[display_name] = p
         return p
 
@@ -268,14 +268,14 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
                 "message": f'Unknown relation type "{row["relation"]}"',
             })
 
-    total_people = len(crud.list_people(conn))
+    total_people = len(crud.list_people(conn, tree_id=tree_id))
     return {
         "people": total_people, "relationships": rel_count,
         "auto_fixes": auto_fixes, "errors": errors,
     }
 
 
-def import_db_file(conn: kuzu.Connection, file_bytes: bytes) -> dict:
+def import_db_file(conn: kuzu.Connection, file_bytes: bytes, tree_id: str = "") -> dict:
     """Import from a SQLite .db file (from legacy or v2 projects)."""
     errors = []
     auto_fixes = []
@@ -293,9 +293,9 @@ def import_db_file(conn: kuzu.Connection, file_bytes: bytes) -> dict:
         ).fetchall()]
 
         if "people" in tables:
-            return _import_legacy_db(conn, src, errors, auto_fixes)
+            return _import_legacy_db(conn, src, errors, auto_fixes, tree_id)
         elif "person" in tables:
-            return _import_starter_db(conn, src, errors, auto_fixes)
+            return _import_starter_db(conn, src, errors, auto_fixes, tree_id)
         else:
             return {
                 "people": 0, "relationships": 0, "auto_fixes": [],
@@ -307,9 +307,9 @@ def import_db_file(conn: kuzu.Connection, file_bytes: bytes) -> dict:
         os.unlink(tmp.name)
 
 
-def _import_legacy_db(conn, src, errors, auto_fixes):
+def _import_legacy_db(conn, src, errors, auto_fixes, tree_id=""):
     """Import from legacy SQLite DB with 'people' and 'relationships' tables."""
-    crud.clear_all(conn)
+    crud.clear_all(conn, tree_id=tree_id)
     cursor = src.cursor()
     people_rows = cursor.execute("SELECT id, raw_name, gender, details FROM people").fetchall()
     id_map = {}
@@ -331,7 +331,7 @@ def _import_legacy_db(conn, src, errors, auto_fixes):
                 "original": clean_name(row["raw_name"]), "resolved": name,
             })
 
-        p = crud.create_person(conn, name, sex, details)
+        p = crud.create_person(conn, name, sex, details, tree_id=tree_id)
         id_map[row["id"]] = p
 
     rel_count = 0
@@ -357,21 +357,21 @@ def _import_legacy_db(conn, src, errors, auto_fixes):
             })
 
     return {
-        "people": len(crud.list_people(conn)), "relationships": rel_count,
+        "people": len(crud.list_people(conn, tree_id=tree_id)), "relationships": rel_count,
         "auto_fixes": auto_fixes, "errors": errors,
     }
 
 
-def _import_starter_db(conn, src, errors, auto_fixes):
+def _import_starter_db(conn, src, errors, auto_fixes, tree_id=""):
     """Import from starter schema SQLite DB with 'person' and 'relationship' tables."""
-    crud.clear_all(conn)
+    crud.clear_all(conn, tree_id=tree_id)
     cursor = src.cursor()
     people_rows = cursor.execute("SELECT id, display_name, sex, notes FROM person").fetchall()
     id_map = {}
 
     for row in people_rows:
         sex = row["sex"] if row["sex"] in ("M", "F", "U") else "U"
-        p = crud.create_person(conn, row["display_name"], sex, row["notes"])
+        p = crud.create_person(conn, row["display_name"], sex, row["notes"], tree_id=tree_id)
         id_map[row["id"]] = p
 
     rel_count = 0
@@ -393,6 +393,6 @@ def _import_starter_db(conn, src, errors, auto_fixes):
             })
 
     return {
-        "people": len(crud.list_people(conn)), "relationships": rel_count,
+        "people": len(crud.list_people(conn, tree_id=tree_id)), "relationships": rel_count,
         "auto_fixes": auto_fixes, "errors": errors,
     }

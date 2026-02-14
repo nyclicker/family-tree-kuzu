@@ -4,38 +4,47 @@ from datetime import datetime, timezone
 import kuzu
 
 
-def create_share_link(conn: kuzu.Connection, dataset: str) -> dict:
-    """Create a shareable token for a dataset."""
+def create_share_link(conn: kuzu.Connection, dataset: str, tree_id: str = "") -> dict:
+    """Create a shareable token for a dataset/tree."""
     token = uuid.uuid4().hex[:12]
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
-        "CREATE (s:ShareLink {id: $id, dataset: $ds, created_at: $ts})",
-        {"id": token, "ds": dataset, "ts": now}
+        "CREATE (s:ShareLink {id: $id, dataset: $ds, tree_id: $tid, created_at: $ts})",
+        {"id": token, "ds": dataset, "tid": tree_id or "", "ts": now}
     )
-    return {"token": token, "dataset": dataset, "created_at": now}
+    return {"token": token, "dataset": dataset, "tree_id": tree_id or "", "created_at": now}
 
 
-def list_share_links(conn: kuzu.Connection) -> list[dict]:
-    """List all share links."""
-    result = conn.execute(
-        "MATCH (s:ShareLink) RETURN s.id, s.dataset, s.created_at ORDER BY s.created_at DESC"
-    )
+def list_share_links(conn: kuzu.Connection, tree_id: str = "") -> list[dict]:
+    """List share links, optionally filtered by tree_id."""
+    if tree_id:
+        result = conn.execute(
+            "MATCH (s:ShareLink) WHERE s.tree_id = $tid "
+            "RETURN s.id, s.dataset, s.tree_id, s.created_at ORDER BY s.created_at DESC",
+            {"tid": tree_id}
+        )
+    else:
+        result = conn.execute(
+            "MATCH (s:ShareLink) RETURN s.id, s.dataset, s.tree_id, s.created_at "
+            "ORDER BY s.created_at DESC"
+        )
     links = []
     while result.has_next():
         row = result.get_next()
-        links.append({"token": row[0], "dataset": row[1], "created_at": row[2]})
+        links.append({"token": row[0], "dataset": row[1], "tree_id": row[2], "created_at": row[3]})
     return links
 
 
 def get_share_link(conn: kuzu.Connection, token: str) -> dict | None:
     """Get a share link by token."""
     result = conn.execute(
-        "MATCH (s:ShareLink) WHERE s.id = $id RETURN s.id, s.dataset, s.created_at",
+        "MATCH (s:ShareLink) WHERE s.id = $id "
+        "RETURN s.id, s.dataset, s.tree_id, s.created_at",
         {"id": token}
     )
     if result.has_next():
         row = result.get_next()
-        return {"token": row[0], "dataset": row[1], "created_at": row[2]}
+        return {"token": row[0], "dataset": row[1], "tree_id": row[2], "created_at": row[3]}
     return None
 
 

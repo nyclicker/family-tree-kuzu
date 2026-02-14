@@ -61,7 +61,6 @@
     .empty-state p { margin-top: 12px; font-size: 13px; color: #bbb; }
     .legend { display: flex; gap: 16px; font-size: 12px; }
     .legend span { display: flex; align-items: center; gap: 4px; }
-    .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
 
     /* Context Menu */
     .ctx-menu {
@@ -154,137 +153,259 @@
       border-radius: 4px; cursor: pointer; transition: background 0.15s;
     }
     .btn-header:hover { background: rgba(255,255,255,0.25); }
+
+    /* Auth screen */
+    #authScreen {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; background: #f5f5f5;
+    }
+    .auth-box {
+      background: white; border-radius: 8px; padding: 32px; width: 380px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    }
+    .auth-box h2 { font-size: 20px; color: #2c3e50; margin-bottom: 20px; text-align: center; }
+    .auth-tabs { display: flex; gap: 0; margin-bottom: 20px; }
+    .auth-tab {
+      flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 600;
+      cursor: pointer; border-bottom: 2px solid #eee; color: #999; transition: all 0.2s;
+    }
+    .auth-tab.active { color: #2c3e50; border-bottom-color: #3498db; }
+    .auth-error { background: #f8d7da; color: #721c24; padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-bottom: 12px; display: none; }
+    #mainApp { display: none; }
+
+    /* Tree selector */
+    .tree-list { list-style: none; max-height: 200px; overflow-y: auto; }
+    .tree-item {
+      padding: 8px 10px; font-size: 13px; border-bottom: 1px solid #eee;
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .tree-item:hover { background: #f0f7ff; }
+    .tree-item.active { background: #ebf5fb; border-left: 3px solid #3498db; }
+    .tree-item .tree-name { flex: 1; font-weight: 500; }
+    .tree-item .tree-role { font-size: 11px; color: #999; margin-left: 8px; }
+
+    /* User info in header */
+    .user-info { display: flex; align-items: center; gap: 12px; }
+    .user-email { font-size: 12px; color: rgba(255,255,255,0.7); }
+
+    /* Members section */
+    .member-item {
+      padding: 6px 0; font-size: 13px; border-bottom: 1px solid #eee;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .member-item .member-info { flex: 1; }
+    .member-item .member-email { font-weight: 500; }
+    .member-item .member-role { font-size: 11px; color: #999; }
+    .member-item .member-actions { display: flex; gap: 4px; align-items: center; }
+    .member-item .member-actions select { font-size: 11px; padding: 2px 4px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Family Tree <span id="datasetLabel" style="font-weight:400; font-size:18px; color:white"></span></h1>
-    <div class="header-actions">
-      <div class="legend">
-        <span style="font-size:11px; color:#aaa">
-          Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse
-        </span>
-        <span style="font-size:10px; color:#667; margin-left:12px">v1.1.0</span>
+  <!-- Auth Screen -->
+  <div id="authScreen">
+    <div class="auth-box">
+      <h2>Family Tree</h2>
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tabLogin" onclick="showAuthTab('login')">Sign In</div>
+        <div class="auth-tab" id="tabRegister" onclick="showAuthTab('register')">Register</div>
       </div>
-      <button class="btn-header" id="exportPngBtn" onclick="exportGraphPng()" style="display:none" title="Download graph as PNG image">Export PNG</button>
-      <button class="btn-header" id="exportSvgBtn" onclick="exportGraphSvg()" style="display:none" title="Download graph as SVG image">Export SVG</button>
-    </div>
-  </header>
-  <div class="container">
-    <div class="sidebar">
-      <!-- Dataset -->
-      <div class="section">
-        <h2>Dataset</h2>
-        <div id="datasetInfo" style="font-size:14px;font-weight:600;color:#2c3e50;margin-bottom:10px">No data loaded</div>
-        <div id="datasetPicker">
-          <div style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;margin-bottom:4px">Available Family Trees</div>
-          <div id="datasetList" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:4px;padding:4px 0;font-size:13px">
-            Loading...
-          </div>
-          <div class="btn-row" style="margin-top:8px">
-            <button class="btn-primary" onclick="loadSelectedDatasets(false)">Load Selected</button>
-            <button class="btn-success" id="combineBtn" onclick="loadSelectedDatasets(true)" style="display:none" title="Add to current graph without clearing">+ Combine</button>
-          </div>
-        </div>
-        <div class="form-group" style="margin-top:12px">
-          <label>Or Upload File (.csv, .txt, .db)</label>
-          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-            <span id="dropLabel">Click or drag a file here</span>
-            <input type="file" id="fileInput" accept=".csv,.txt,.db" style="display:none" onchange="onFileSelected(this)">
-          </div>
-        </div>
-        <div class="btn-row" style="margin-top:6px">
-          <button class="btn-success" id="saveBtn" onclick="saveChanges()" style="display:none">Save (CSV)</button>
-          <button class="btn-danger" id="clearBtn" onclick="clearData()" style="display:none;font-size:12px">Clear All</button>
-        </div>
-        <div id="loadStatus" class="status"></div>
-      </div>
-
-      <!-- Import Report -->
-      <div class="section" id="importReportSection" style="display:none">
-        <h2>Import Report</h2>
-        <div id="importSummary" class="import-summary"></div>
-        <div id="importFixes" style="display:none">
-          <div class="report-label">Auto-fixed</div>
-          <ul id="fixesList" class="report-list"></ul>
-        </div>
-        <div id="importErrors" style="display:none">
-          <div class="report-label errors">Needs Attention</div>
-          <ul id="errorsList" class="report-list errors"></ul>
-        </div>
-      </div>
-
-      <!-- Add Person -->
-      <div class="section">
-        <h2>Add Person</h2>
+      <div id="authError" class="auth-error"></div>
+      <!-- Login Form -->
+      <div id="loginForm">
         <div class="form-group">
-          <label>Name</label>
-          <input type="text" id="personName" placeholder="e.g. John Smith">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com">
         </div>
         <div class="form-group">
-          <label>Sex</label>
-          <select id="personSex">
-            <option value="M">Male</option>
-            <option value="F">Female</option>
-            <option value="U">Unknown</option>
-          </select>
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn-primary" onclick="doLogin()" style="width:100%;margin-top:8px">Sign In</button>
+      </div>
+      <!-- Register Form -->
+      <div id="registerForm" style="display:none">
+        <div class="form-group">
+          <label>Display Name</label>
+          <input type="text" id="regName" placeholder="Your Name">
         </div>
         <div class="form-group">
-          <label>Notes</label>
-          <textarea id="personNotes" placeholder="Optional notes..."></textarea>
+          <label>Email</label>
+          <input type="email" id="regEmail" placeholder="you@example.com">
         </div>
-        <button class="btn-primary" onclick="addPerson()">Add Person</button>
-        <div id="personStatus" class="status"></div>
-      </div>
-
-      <!-- Sharing -->
-      <div class="section" id="sharingSection" style="display:none">
-        <h2>Share Tree</h2>
-        <div id="shareLinks"></div>
-        <button class="btn-primary" onclick="createShareLink()" style="margin-top:8px">Create Share Link</button>
-
-        <div id="shareDetail" style="display:none; margin-top:16px; border-top:1px solid #eee; padding-top:12px">
-          <div style="font-size:12px; color:#666; margin-bottom:6px">Share link:</div>
-          <div style="display:flex; gap:4px; margin-bottom:12px">
-            <input type="text" id="shareLinkUrl" readonly style="flex:1; font-size:12px; background:#f9f9f9; cursor:text">
-            <button class="btn-primary" onclick="copyShareLink()" style="padding:6px 10px; font-size:11px">Copy</button>
-          </div>
-
-          <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Allowed Viewers</div>
-          <ul id="viewerList" class="person-list" style="max-height:150px; margin-bottom:8px"></ul>
-          <div style="display:flex; gap:4px">
-            <input type="email" id="viewerEmail" placeholder="viewer@email.com" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #ccc; border-radius:4px">
-            <button class="btn-success" onclick="addViewer()" style="padding:6px 10px; font-size:12px">Add</button>
-          </div>
-
-          <div style="margin-top:12px">
-            <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Access Log</div>
-            <ul id="accessLog" class="report-list" style="max-height:120px"></ul>
-          </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="regPassword" placeholder="Password">
         </div>
-      </div>
-
-      <!-- Search & People List -->
-      <div class="section">
-        <h2>Search People</h2>
-        <div class="form-group" style="margin-bottom:8px">
-          <input type="text" id="searchInput" placeholder="Type a name to search..." oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+        <div class="form-group" id="setupTokenGroup">
+          <label>Setup Token (first user only)</label>
+          <input type="text" id="regSetupToken" placeholder="Setup token from server admin">
         </div>
-        <div id="searchCount" class="search-count"></div>
-        <ul id="peopleList" class="person-list">
-          <li style="color:#999">No people added yet</li>
-        </ul>
-      </div>
-    </div>
-    <div id="cy">
-      <button class="reset-btn" id="resetBtn" onclick="resetLayout()" style="display:none" title="Reset graph layout to default">Reset Layout</button>
-      <div class="empty-state" id="emptyState">
-        <div style="font-size:48px">&#x1F333;</div>
-        <div>No family members yet</div>
-        <p>Add people using the sidebar, then create relationships between them.</p>
+        <button class="btn-primary" onclick="doRegister()" style="width:100%;margin-top:8px">Create Account</button>
       </div>
     </div>
   </div>
+
+  <!-- Main App (hidden until authenticated) -->
+  <div id="mainApp">
+    <header>
+      <h1>Family Tree <span id="datasetLabel" style="font-weight:400; font-size:18px; color:white"></span></h1>
+      <div class="header-actions">
+        <div class="legend">
+          <span style="font-size:11px; color:#aaa">
+            Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse
+          </span>
+        </div>
+        <button class="btn-header" id="exportPngBtn" onclick="exportGraphPng()" style="display:none" title="Download graph as PNG image">Export PNG</button>
+        <button class="btn-header" id="exportSvgBtn" onclick="exportGraphSvg()" style="display:none" title="Download graph as SVG image">Export SVG</button>
+        <div class="user-info">
+          <span class="user-email" id="userEmail"></span>
+          <button class="btn-header" onclick="doLogout()">Logout</button>
+        </div>
+      </div>
+    </header>
+    <div class="container">
+      <div class="sidebar">
+        <!-- Tree Selector -->
+        <div class="section">
+          <h2>My Trees</h2>
+          <ul id="treeList" class="tree-list">
+            <li style="color:#999;padding:8px">Loading...</li>
+          </ul>
+          <button class="btn-primary" onclick="openCreateTreeModal()" style="margin-top:8px">+ New Tree</button>
+        </div>
+
+        <!-- Dataset (import into selected tree) -->
+        <div class="section" id="dataSection" style="display:none">
+          <h2>Import Data</h2>
+          <div id="datasetPicker">
+            <div style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;margin-bottom:4px">Available Family Trees</div>
+            <div id="datasetList" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:4px;padding:4px 0;font-size:13px">
+              Loading...
+            </div>
+            <div class="btn-row" style="margin-top:8px">
+              <button class="btn-primary" onclick="loadSelectedDatasets(false)">Load Selected</button>
+              <button class="btn-success" id="combineBtn" onclick="loadSelectedDatasets(true)" style="display:none" title="Add to current graph without clearing">+ Combine</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:12px">
+            <label>Or Upload File (.csv, .txt, .db)</label>
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+              <span id="dropLabel">Click or drag a file here</span>
+              <input type="file" id="fileInput" accept=".csv,.txt,.db" style="display:none" onchange="onFileSelected(this)">
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:6px">
+            <button class="btn-success" id="saveBtn" onclick="saveChanges()" style="display:none">Save (CSV)</button>
+            <button class="btn-danger" id="clearBtn" onclick="clearData()" style="display:none;font-size:12px">Clear All</button>
+          </div>
+          <div id="loadStatus" class="status"></div>
+        </div>
+
+        <!-- Import Report -->
+        <div class="section" id="importReportSection" style="display:none">
+          <h2>Import Report</h2>
+          <div id="importSummary" class="import-summary"></div>
+          <div id="importFixes" style="display:none">
+            <div class="report-label">Auto-fixed</div>
+            <ul id="fixesList" class="report-list"></ul>
+          </div>
+          <div id="importErrors" style="display:none">
+            <div class="report-label errors">Needs Attention</div>
+            <ul id="errorsList" class="report-list errors"></ul>
+          </div>
+        </div>
+
+        <!-- Add Person (editors/owners only) -->
+        <div class="section" id="addPersonSection" style="display:none">
+          <h2>Add Person</h2>
+          <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="personName" placeholder="e.g. John Smith">
+          </div>
+          <div class="form-group">
+            <label>Sex</label>
+            <select id="personSex">
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+              <option value="U">Unknown</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="personNotes" placeholder="Optional notes..."></textarea>
+          </div>
+          <button class="btn-primary" onclick="addPerson()">Add Person</button>
+          <div id="personStatus" class="status"></div>
+        </div>
+
+        <!-- Sharing (owners only) -->
+        <div class="section" id="sharingSection" style="display:none">
+          <h2>Share Tree</h2>
+          <div id="shareLinks"></div>
+          <button class="btn-primary" onclick="createShareLink()" style="margin-top:8px">Create Share Link</button>
+
+          <div id="shareDetail" style="display:none; margin-top:16px; border-top:1px solid #eee; padding-top:12px">
+            <div style="font-size:12px; color:#666; margin-bottom:6px">Share link:</div>
+            <div style="display:flex; gap:4px; margin-bottom:12px">
+              <input type="text" id="shareLinkUrl" readonly style="flex:1; font-size:12px; background:#f9f9f9; cursor:text">
+              <button class="btn-primary" onclick="copyShareLink()" style="padding:6px 10px; font-size:11px">Copy</button>
+            </div>
+
+            <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Allowed Viewers</div>
+            <ul id="viewerList" class="person-list" style="max-height:150px; margin-bottom:8px"></ul>
+            <div style="display:flex; gap:4px">
+              <input type="email" id="viewerEmail" placeholder="viewer@email.com" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #ccc; border-radius:4px">
+              <button class="btn-success" onclick="addViewer()" style="padding:6px 10px; font-size:12px">Add</button>
+            </div>
+
+            <div style="margin-top:12px">
+              <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Access Log</div>
+              <ul id="accessLog" class="report-list" style="max-height:120px"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Members (owners only) -->
+        <div class="section" id="membersSection" style="display:none">
+          <h2>Tree Members</h2>
+          <div id="membersList"></div>
+          <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px">
+            <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Add Member</div>
+            <div style="display:flex; gap:4px">
+              <input type="email" id="memberEmail" placeholder="user@email.com" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #ccc; border-radius:4px">
+              <select id="memberRole" style="padding:6px; font-size:12px; border:1px solid #ccc; border-radius:4px">
+                <option value="viewer">Viewer</option>
+                <option value="editor">Editor</option>
+              </select>
+              <button class="btn-success" onclick="addTreeMember()" style="padding:6px 10px; font-size:12px">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search & People List -->
+        <div class="section" id="searchSection" style="display:none">
+          <h2>Search People</h2>
+          <div class="form-group" style="margin-bottom:8px">
+            <input type="text" id="searchInput" placeholder="Type a name to search..." oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+          </div>
+          <div id="searchCount" class="search-count"></div>
+          <ul id="peopleList" class="person-list">
+            <li style="color:#999">No people added yet</li>
+          </ul>
+        </div>
+      </div>
+      <div id="cy">
+        <button class="reset-btn" id="resetBtn" onclick="resetLayout()" style="display:none" title="Reset graph layout to default">Reset Layout</button>
+        <div class="empty-state" id="emptyState">
+          <div style="font-size:48px">&#x1F333;</div>
+          <div>No family members yet</div>
+          <p>Select a tree, then add people or import data.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Context Menus -->
   <div id="ctxNode" class="ctx-menu">
     <div class="ctx-item" onclick="ctxEditPerson()"><span class="ctx-icon">&#9998;</span> Edit Person</div>
@@ -508,6 +629,21 @@
     </div>
   </div>
 
-  <script src="/web/app.js?v=4"></script>
+  <!-- Create Tree Modal -->
+  <div id="createTreeModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Create New Tree</h3>
+      <div class="form-group">
+        <label>Tree Name</label>
+        <input type="text" id="newTreeName" placeholder="e.g. Smith Family" onkeydown="if(event.key==='Enter')createTree()">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('createTreeModal')">Cancel</button>
+        <button class="btn-primary" onclick="createTree()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/web/app.js?v=5"></script>
 </body>
 </html>

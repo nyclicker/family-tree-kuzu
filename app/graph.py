@@ -2,8 +2,13 @@
 import kuzu
 
 
-def build_graph(conn: kuzu.Connection, dataset: str | None = None):
-    if dataset:
+def build_graph(conn: kuzu.Connection, dataset: str | None = None, tree_id: str | None = None):
+    if tree_id:
+        result = conn.execute(
+            "MATCH (p:Person) WHERE p.tree_id = $tid RETURN p.id, p.display_name",
+            {"tid": tree_id}
+        )
+    elif dataset:
         result = conn.execute(
             "MATCH (p:Person) WHERE p.dataset = $ds RETURN p.id, p.display_name",
             {"ds": dataset}
@@ -24,8 +29,8 @@ def build_graph(conn: kuzu.Connection, dataset: str | None = None):
         )
         while result.has_next():
             row = result.get_next()
-            # When filtering by dataset, only include edges between nodes in the set
-            if dataset and (row[1] not in node_ids or row[2] not in node_ids):
+            # When filtering by dataset/tree, only include edges between nodes in the set
+            if (dataset or tree_id) and (row[1] not in node_ids or row[2] not in node_ids):
                 continue
             edges.append({"data": {
                 "id": row[0], "source": row[1], "target": row[2], "type": rel_type

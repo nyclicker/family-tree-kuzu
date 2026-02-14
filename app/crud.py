@@ -15,30 +15,46 @@ def _person_from_row(row):
 
 
 def create_person(conn: kuzu.Connection, display_name: str, sex: str = "U",
-                  notes: str | None = None, dataset: str = ""):
+                  notes: str | None = None, dataset: str = "", tree_id: str = ""):
     pid = str(uuid.uuid4())
     conn.execute(
-        "CREATE (p:Person {id: $id, display_name: $name, sex: $sex, notes: $notes, dataset: $ds})",
-        {"id": pid, "name": display_name, "sex": sex, "notes": notes or "", "ds": dataset or ""}
+        "CREATE (p:Person {id: $id, display_name: $name, sex: $sex, notes: $notes, "
+        "dataset: $ds, tree_id: $tid})",
+        {"id": pid, "name": display_name, "sex": sex, "notes": notes or "",
+         "ds": dataset or "", "tid": tree_id or ""}
     )
     return {"id": pid, "display_name": display_name, "sex": sex, "notes": notes}
 
 
-def list_people(conn: kuzu.Connection):
-    result = conn.execute(
-        "MATCH (p:Person) RETURN p.id, p.display_name, p.sex, p.notes ORDER BY p.display_name"
-    )
+def list_people(conn: kuzu.Connection, tree_id: str = ""):
+    if tree_id:
+        result = conn.execute(
+            "MATCH (p:Person) WHERE p.tree_id = $tid "
+            "RETURN p.id, p.display_name, p.sex, p.notes ORDER BY p.display_name",
+            {"tid": tree_id}
+        )
+    else:
+        result = conn.execute(
+            "MATCH (p:Person) RETURN p.id, p.display_name, p.sex, p.notes ORDER BY p.display_name"
+        )
     people = []
     while result.has_next():
         people.append(_person_from_row(result.get_next()))
     return people
 
 
-def get_person(conn: kuzu.Connection, person_id: str):
-    result = conn.execute(
-        "MATCH (p:Person) WHERE p.id = $id RETURN p.id, p.display_name, p.sex, p.notes",
-        {"id": person_id}
-    )
+def get_person(conn: kuzu.Connection, person_id: str, tree_id: str = ""):
+    if tree_id:
+        result = conn.execute(
+            "MATCH (p:Person) WHERE p.id = $id AND p.tree_id = $tid "
+            "RETURN p.id, p.display_name, p.sex, p.notes",
+            {"id": person_id, "tid": tree_id}
+        )
+    else:
+        result = conn.execute(
+            "MATCH (p:Person) WHERE p.id = $id RETURN p.id, p.display_name, p.sex, p.notes",
+            {"id": person_id}
+        )
     if result.has_next():
         return _person_from_row(result.get_next())
     return None
@@ -57,8 +73,8 @@ def create_relationship(conn: kuzu.Connection, from_id: str, to_id: str, rel_typ
 
 
 def update_person(conn: kuzu.Connection, person_id: str, display_name: str,
-                  sex: str, notes: str | None = None):
-    if not get_person(conn, person_id):
+                  sex: str, notes: str | None = None, tree_id: str = ""):
+    if not get_person(conn, person_id, tree_id):
         return None
     conn.execute(
         "MATCH (p:Person) WHERE p.id = $id "
@@ -68,7 +84,11 @@ def update_person(conn: kuzu.Connection, person_id: str, display_name: str,
     return {"id": person_id, "display_name": display_name, "sex": sex, "notes": notes}
 
 
-def delete_person(conn: kuzu.Connection, person_id: str):
+def delete_person(conn: kuzu.Connection, person_id: str, tree_id: str = ""):
+    if tree_id:
+        # Verify person belongs to tree before deleting
+        if not get_person(conn, person_id, tree_id):
+            return
     conn.execute("MATCH (p:Person) WHERE p.id = $id DETACH DELETE p", {"id": person_id})
 
 
@@ -83,11 +103,18 @@ def delete_relationship(conn: kuzu.Connection, rel_id: str):
             pass
 
 
-def find_person_by_name(conn: kuzu.Connection, display_name: str):
-    result = conn.execute(
-        "MATCH (p:Person) WHERE p.display_name = $name RETURN p.id, p.display_name, p.sex, p.notes",
-        {"name": display_name}
-    )
+def find_person_by_name(conn: kuzu.Connection, display_name: str, tree_id: str = ""):
+    if tree_id:
+        result = conn.execute(
+            "MATCH (p:Person) WHERE p.display_name = $name AND p.tree_id = $tid "
+            "RETURN p.id, p.display_name, p.sex, p.notes",
+            {"name": display_name, "tid": tree_id}
+        )
+    else:
+        result = conn.execute(
+            "MATCH (p:Person) WHERE p.display_name = $name RETURN p.id, p.display_name, p.sex, p.notes",
+            {"name": display_name}
+        )
     if result.has_next():
         return _person_from_row(result.get_next())
     return None
@@ -202,9 +229,9 @@ def merge_person_into(conn: kuzu.Connection, keep_id: str, remove_id: str):
 def merge_spouse_children(conn: kuzu.Connection, spouse_a_id: str, spouse_b_id: str):
     """After linking spouses, merge common children and share all children between both parents.
 
-    1. Children with matching names under both parents → merge into one node
-    2. Children only under A → also become children of B
-    3. Children only under B → also become children of A
+    1. Children with matching names under both parents -> merge into one node
+    2. Children only under A -> also become children of B
+    3. Children only under B -> also become children of A
 
     Returns dict with merged, adopted_by_a, adopted_by_b lists."""
     children_a = get_children(conn, spouse_a_id)
@@ -227,7 +254,7 @@ def merge_spouse_children(conn: kuzu.Connection, spouse_a_id: str, spouse_b_id: 
         merge_person_into(conn, keep["id"], remove["id"])
         merged.append({"name": name, "kept_id": keep["id"], "removed_id": remove["id"]})
 
-    # 2. Children only under A → add B as parent too
+    # 2. Children only under A -> add B as parent too
     shared_with_b = []
     for name in sorted(a_only):
         child = a_by_name[name]
@@ -235,7 +262,7 @@ def merge_spouse_children(conn: kuzu.Connection, spouse_a_id: str, spouse_b_id: 
             create_relationship(conn, spouse_b_id, child["id"], "PARENT_OF")
             shared_with_b.append(name)
 
-    # 3. Children only under B → add A as parent too
+    # 3. Children only under B -> add A as parent too
     shared_with_a = []
     for name in sorted(b_only):
         child = b_by_name[name]
@@ -273,5 +300,8 @@ def count_spouses(conn: kuzu.Connection, person_id: str) -> int:
     return 0
 
 
-def clear_all(conn: kuzu.Connection):
-    conn.execute("MATCH (p:Person) DETACH DELETE p")
+def clear_all(conn: kuzu.Connection, tree_id: str = ""):
+    if tree_id:
+        conn.execute("MATCH (p:Person) WHERE p.tree_id = $tid DETACH DELETE p", {"tid": tree_id})
+    else:
+        conn.execute("MATCH (p:Person) DETACH DELETE p")
