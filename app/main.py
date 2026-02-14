@@ -1,14 +1,44 @@
 import re
+import os
+import hashlib
+import secrets
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, UploadFile, File, Request, HTTPException
-from fastapi.responses import FileResponse, Response, HTMLResponse
+from fastapi.responses import FileResponse, Response, HTMLResponse, RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from .db import get_database, get_conn
 from . import crud, schemas, graph, sharing
 from .importer import import_csv_text, import_db_file
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+# Admin authentication via environment variable
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+_cookie_secret = os.environ.get("COOKIE_SECRET", secrets.token_hex(16))
+
+
+def _make_admin_token():
+    return hashlib.sha256(f"{ADMIN_PASSWORD}:{_cookie_secret}".encode()).hexdigest()
+
+
+# Paths that don't require admin auth
+_PUBLIC_PATHS = {"/login", "/health"}
+_PUBLIC_PREFIXES = ("/view/",)
+
+
+class AdminAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if not ADMIN_PASSWORD:
+            return await call_next(request)
+        path = request.url.path
+        if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+            return await call_next(request)
+        token = request.cookies.get("admin_token")
+        if token != _make_admin_token():
+            return RedirectResponse("/login", status_code=302)
+        return await call_next(request)
 
 
 def _clean_display_names(conn):
@@ -47,6 +77,72 @@ async def lifespan(app):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(AdminAuthMiddleware)
+
+
+@app.get("/login", include_in_schema=False)
+def login_page():
+    if not ADMIN_PASSWORD:
+        return RedirectResponse("/", status_code=302)
+    return HTMLResponse("""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Login — Family Tree</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;height:100vh}
+.card{background:white;padding:40px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);width:340px;text-align:center}
+.card h1{font-size:48px;margin-bottom:8px}
+.card h2{font-size:20px;color:#2c3e50;margin-bottom:24px}
+input{width:100%;padding:10px 14px;border:1px solid #ccc;border-radius:4px;font-size:15px;margin-bottom:14px}
+button{width:100%;padding:10px;background:#3498db;color:white;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer}
+button:hover{background:#2980b9}
+.error{color:#e74c3c;font-size:13px;margin-bottom:10px;display:none}
+</style></head><body>
+<div class="card">
+<h1>&#x1F333;</h1><h2>Family Tree</h2>
+<div class="error" id="err">Incorrect password</div>
+<form method="POST" action="/login">
+<input type="password" name="password" placeholder="Enter admin password" autofocus>
+<button type="submit">Log In</button>
+</form></div></body></html>""")
+
+
+@app.post("/login", include_in_schema=False)
+async def login_submit(request: Request):
+    form = await request.form()
+    password = form.get("password", "")
+    if password != ADMIN_PASSWORD:
+        return HTMLResponse("""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Login — Family Tree</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;height:100vh}
+.card{background:white;padding:40px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.1);width:340px;text-align:center}
+.card h1{font-size:48px;margin-bottom:8px}
+.card h2{font-size:20px;color:#2c3e50;margin-bottom:24px}
+input{width:100%;padding:10px 14px;border:1px solid #ccc;border-radius:4px;font-size:15px;margin-bottom:14px}
+button{width:100%;padding:10px;background:#3498db;color:white;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer}
+button:hover{background:#2980b9}
+.error{color:#e74c3c;font-size:13px;margin-bottom:10px}
+</style></head><body>
+<div class="card">
+<h1>&#x1F333;</h1><h2>Family Tree</h2>
+<div class="error">Incorrect password</div>
+<form method="POST" action="/login">
+<input type="password" name="password" placeholder="Enter admin password" autofocus>
+<button type="submit">Log In</button>
+</form></div></body></html>""", status_code=401)
+    response = RedirectResponse("/", status_code=302)
+    response.set_cookie("admin_token", _make_admin_token(), httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/logout", include_in_schema=False)
+def logout():
+    response = RedirectResponse("/login", status_code=302)
+    response.delete_cookie("admin_token")
+    return response
 
 
 @app.get("/", include_in_schema=False)
