@@ -3,6 +3,7 @@ WORKDIR /app
 COPY pyproject.toml /app/
 COPY app /app/app
 COPY web /app/web
+COPY data /app/data
 RUN pip install --no-cache-dir -e .
 ENV PORT=8080
 EXPOSE 8080
