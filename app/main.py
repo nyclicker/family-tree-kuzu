@@ -50,6 +50,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/", include_in_schema=False)
+@app.head("/", include_in_schema=False)
 def ui():
     return FileResponse("web/index.html")
 
