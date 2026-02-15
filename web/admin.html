@@ -196,12 +196,14 @@
                 <div id="groupMembersList" class="sub-list"></div>
                 <div class="form-inline" style="margin-top:8px">
                   <div class="form-group">
-                    <input type="email" id="groupMemberEmail" placeholder="user@email.com">
+                    <select id="groupMemberSelect">
+                      <option value="">Select a user...</option>
+                    </select>
                   </div>
                   <button class="btn-success btn-sm" onclick="addGroupMember()">Add</button>
                 </div>
+                <div style="font-size:11px;color:#999;margin-top:4px">Create users in the <a href="#" onclick="switchTab('users');return false" style="color:#3498db">Users tab</a> first.</div>
                 <div id="groupMemberStatus" class="status-msg"></div>
-                <div id="groupMemberMagicLink" class="magic-link-box"></div>
               </div>
             </div>
 
@@ -341,6 +343,7 @@
         <label>Description</label>
         <input type="text" id="newGroupDesc" placeholder="Optional description">
       </div>
+      <div id="createGroupStatus" class="status-msg"></div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeModal('createGroupModal')">Cancel</button>
         <button class="btn-primary" onclick="createGroup()">Create</button>
@@ -369,6 +372,6 @@
     </div>
   </div>
 
-  <script src="/web/admin.js?v=2"></script>
+  <script src="/web/admin.js?v=3"></script>
 </body>
 </html>

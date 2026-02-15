@@ -72,7 +72,7 @@ async function doLogout() {
 
 // ── Tab switching ──
 
-function switchTab(tab) {
+async function switchTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === tab);
@@ -80,16 +80,26 @@ function switchTab(tab) {
   document.querySelectorAll('.panel').forEach(p => {
     p.classList.toggle('active', p.id === 'panel' + tab.charAt(0).toUpperCase() + tab.slice(1));
   });
-  if (tab === 'groups') loadGroups();
+  if (tab === 'groups') {
+    await loadAllUsers();  // refresh user list for member selector
+    loadGroups();
+    if (selectedGroupId) populateGroupMemberSelect();
+  }
   if (tab === 'users') loadUsers();
   if (tab === 'trees') loadAdminTrees();
 }
 
 // ── Init ──
 
-function initAdmin() {
-  loadGroups();
-  loadAllTrees();
+async function initAdmin() {
+  await Promise.all([loadGroups(), loadAllTrees(), loadAllUsers()]);
+}
+
+async function loadAllUsers() {
+  try {
+    const res = await apiFetch('/api/admin/users');
+    if (res.ok) users = await res.json();
+  } catch (e) { /* ignore */ }
 }
 
 async function loadAllTrees() {
@@ -165,13 +175,13 @@ async function createGroup() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, description })
     });
-    if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
-    const group = await res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed');
     closeModal('createGroupModal');
     await loadGroups();
-    selectGroup(group.id);
+    selectGroup(data.id);
   } catch (e) {
-    alert('Error: ' + e.message);
+    showStatus('createGroupStatus', 'Error: ' + e.message, true);
   }
 }
 
@@ -209,12 +219,15 @@ async function deleteSelectedGroup() {
 
 // ── Group Members ──
 
+let currentGroupMembers = [];
+
 async function loadGroupMembers(gid) {
   try {
     const res = await apiFetch(`/api/groups/${gid}/members`);
     if (!res.ok) return;
-    const members = await res.json();
-    renderGroupMembers(members);
+    currentGroupMembers = await res.json();
+    renderGroupMembers(currentGroupMembers);
+    populateGroupMemberSelect();
   } catch (e) { /* ignore */ }
 }
 
@@ -237,36 +250,37 @@ function renderGroupMembers(members) {
   ).join('');
 }
 
+function populateGroupMemberSelect() {
+  const sel = document.getElementById('groupMemberSelect');
+  const memberIds = new Set(currentGroupMembers.map(m => m.id));
+  const available = users.filter(u => !memberIds.has(u.id));
+  if (available.length === 0) {
+    sel.innerHTML = '<option value="">No users available</option>';
+  } else {
+    sel.innerHTML = '<option value="">Select a user...</option>' +
+      available.map(u => `<option value="${u.id}">${escapeHtml(u.display_name)} (${escapeHtml(u.email)})</option>`).join('');
+  }
+}
+
 async function addGroupMember() {
   if (!selectedGroupId) return;
-  const email = document.getElementById('groupMemberEmail').value.trim();
-  if (!email) return;
+  const sel = document.getElementById('groupMemberSelect');
+  const userId = sel.value;
+  if (!userId) return;
+  const user = users.find(u => u.id === userId);
+  if (!user) return;
   try {
     const res = await apiFetch(`/api/groups/${selectedGroupId}/members`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email: user.email })
     });
     if (!res.ok) {
       const err = await res.json();
       showStatus('groupMemberStatus', err.detail || 'Failed to add member', true);
       return;
     }
-    const data = await res.json();
-    document.getElementById('groupMemberEmail').value = '';
-    // Show magic link for newly created or existing users
-    if (data.magic_link) {
-      const mlEl = document.getElementById('groupMemberMagicLink');
-      const label = data.created ? 'New user created. Share this login link:' : 'Member added. Login link:';
-      mlEl.innerHTML = `<strong>${label}</strong><br>
-        <input type="text" value="${escapeHtml(data.magic_link)}" readonly
-          style="width:100%;font-size:11px;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;background:#fff"
-          onclick="this.select()">
-        <button class="btn-primary btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(data.magic_link)}').then(()=>this.textContent='Copied!')" style="margin-top:4px">Copy Link</button>`;
-      mlEl.className = 'magic-link-box visible';
-    } else {
-      showStatus('groupMemberStatus', 'Member added', false);
-    }
+    showStatus('groupMemberStatus', `Added ${user.display_name}`, false);
     await loadGroupMembers(selectedGroupId);
   } catch (e) {
     showStatus('groupMemberStatus', 'Error: ' + e.message, true);
@@ -378,12 +392,8 @@ async function removeGroupTree(treeId) {
 // ══════════════════════════════════════════════════════════
 
 async function loadUsers() {
-  try {
-    const res = await apiFetch('/api/admin/users');
-    if (!res.ok) return;
-    users = await res.json();
-    renderUsers();
-  } catch (e) { /* ignore */ }
+  await loadAllUsers();
+  renderUsers();
 }
 
 function renderUsers() {
