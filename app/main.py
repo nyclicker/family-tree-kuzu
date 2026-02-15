@@ -28,7 +28,7 @@ def _make_admin_token():
 
 # Paths that don't require authentication
 _PUBLIC_PATHS = {"/login", "/health", "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/setup-status"}
-_PUBLIC_PREFIXES = ("/view/",)
+_PUBLIC_PREFIXES = ("/view/", "/auth/magic/")
 
 
 class SessionAuthMiddleware(BaseHTTPMiddleware):
@@ -223,6 +223,18 @@ def logout():
     return response
 
 
+@app.get("/auth/magic/{token}")
+def magic_login(token: str, conn=Depends(get_conn)):
+    """Login via magic link. Sets session cookie and redirects to /."""
+    user = auth.get_user_by_magic_token(conn, token)
+    if not user:
+        raise HTTPException(404, "Invalid or expired magic link")
+    response = RedirectResponse("/", status_code=302)
+    session_token = auth.create_session_token(user["id"])
+    response.set_cookie(auth.SESSION_COOKIE, session_token, httponly=True, samesite="lax")
+    return response
+
+
 @app.get("/api/auth/me")
 def me(user=Depends(auth.get_current_user)):
     return user
@@ -271,18 +283,24 @@ def list_members(tree_id: str, user=Depends(auth.get_current_user),
 
 
 @app.post("/api/trees/{tree_id}/members")
-def add_member(tree_id: str, body: schemas.TreeMemberAdd,
+def add_member(tree_id: str, body: schemas.TreeMemberAdd, request: Request,
                user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "owner")
     target_user = auth.get_user_by_email(conn, body.email)
     if not target_user:
-        raise HTTPException(404, f"No user found with email {body.email}")
+        # Auto-create invited user (no password)
+        display_name = body.email.split("@")[0]
+        target_user = auth.create_user_invited(conn, body.email, display_name)
     # Can't add owner to their own tree as a member
     owner_id = trees.get_tree_owner_id(conn, tree_id)
     if target_user["id"] == owner_id:
         raise HTTPException(400, "Cannot add the owner as a member")
     trees.grant_user_access(conn, tree_id, target_user["id"], body.role)
-    return {"ok": True, "user_id": target_user["id"]}
+    # Generate magic link for the member
+    token = auth.ensure_magic_token(conn, target_user["id"])
+    base_url = str(request.base_url).rstrip("/")
+    magic_link = f"{base_url}/auth/magic/{token}"
+    return {"ok": True, "user_id": target_user["id"], "magic_link": magic_link}
 
 
 @app.put("/api/trees/{tree_id}/members/{uid}")
@@ -299,6 +317,16 @@ def remove_member(tree_id: str, uid: str, user=Depends(auth.get_current_user),
     trees.require_role(conn, user["id"], tree_id, "owner")
     trees.revoke_user_access(conn, tree_id, uid)
     return {"ok": True}
+
+
+@app.get("/api/trees/{tree_id}/members/{uid}/magic-link")
+def get_member_magic_link(tree_id: str, uid: str, request: Request,
+                          user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    """Owner-only: get (or generate) the magic login link for a member."""
+    trees.require_role(conn, user["id"], tree_id, "owner")
+    token = auth.ensure_magic_token(conn, uid)
+    base_url = str(request.base_url).rstrip("/")
+    return {"magic_link": f"{base_url}/auth/magic/{token}"}
 
 
 @app.post("/api/trees/{tree_id}/groups")

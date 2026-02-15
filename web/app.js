@@ -1836,6 +1836,7 @@ function renderMembers(data) {
         <div class="member-role">${u.display_name ? escapeHtml(u.display_name) + ' — ' : ''}${u.role}</div>
       </div>
       <div class="member-actions">
+        <button class="magic-link-btn" onclick="getMagicLink('${u.id}')" title="Get magic login link">&#x1F517;</button>
         <select onchange="updateMemberRole('${u.id}', this.value)">
           <option value="viewer"${u.role === 'viewer' ? ' selected' : ''}>Viewer</option>
           <option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option>
@@ -1880,8 +1881,38 @@ async function addTreeMember() {
       alert(err.detail || 'Failed to add member');
       return;
     }
+    const data = await res.json();
     document.getElementById('memberEmail').value = '';
     await loadMembers();
+    if (data.magic_link) {
+      showMagicLinkModal(data.magic_link);
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function showMagicLinkModal(link) {
+  document.getElementById('magicLinkUrl').value = link;
+  document.getElementById('magicLinkCopied').style.display = 'none';
+  openModal('magicLinkModal');
+}
+
+function copyMagicLink() {
+  const input = document.getElementById('magicLinkUrl');
+  navigator.clipboard.writeText(input.value).then(() => {
+    document.getElementById('magicLinkCopied').style.display = 'block';
+    setTimeout(() => { document.getElementById('magicLinkCopied').style.display = 'none'; }, 2000);
+  });
+}
+
+async function getMagicLink(userId) {
+  if (!currentTreeId || !isOwner()) return;
+  try {
+    const res = await fetch(treeApi(`/members/${userId}/magic-link`));
+    if (!res.ok) throw new Error('Failed to get magic link');
+    const data = await res.json();
+    showMagicLinkModal(data.magic_link);
   } catch (e) {
     alert('Error: ' + e.message);
   }

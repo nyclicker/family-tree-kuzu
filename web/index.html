@@ -199,6 +199,11 @@
     .member-item .member-role { font-size: 11px; color: #999; }
     .member-item .member-actions { display: flex; gap: 4px; align-items: center; }
     .member-item .member-actions select { font-size: 11px; padding: 2px 4px; }
+    .member-item .member-actions .magic-link-btn {
+      background: none; border: none; cursor: pointer; padding: 2px 4px;
+      font-size: 14px; color: #3498db; title: "Get magic link";
+    }
+    .member-item .member-actions .magic-link-btn:hover { color: #2980b9; }
 
     /* Comments */
     .comments-section { margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
@@ -254,6 +259,7 @@
           <input type="password" id="loginPassword" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
         </div>
         <button class="btn-primary" onclick="doLogin()" style="width:100%;margin-top:8px">Sign In</button>
+        <p style="font-size:12px;color:#999;margin-top:12px;text-align:center">Have a magic link? Just click it to sign in.</p>
       </div>
       <!-- Register Form -->
       <div id="registerForm" style="display:none">
@@ -752,6 +758,22 @@
     </div>
   </div>
 
-  <script src="/web/app.js?v=8"></script>
+  <!-- Magic Link Modal -->
+  <div id="magicLinkModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Magic Login Link</h3>
+      <p style="font-size:13px;color:#555;margin-bottom:12px">Share this link with the member so they can sign in without a password:</p>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <input type="text" id="magicLinkUrl" readonly style="flex:1;font-size:12px;background:#f9f9f9;cursor:text;padding:8px 10px;border:1px solid #ccc;border-radius:4px">
+        <button class="btn-primary" onclick="copyMagicLink()" style="padding:8px 12px;font-size:12px">Copy</button>
+      </div>
+      <div id="magicLinkCopied" style="font-size:12px;color:#27ae60;display:none">Copied to clipboard!</div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('magicLinkModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/web/app.js?v=9"></script>
 </body>
 </html>

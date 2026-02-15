@@ -125,6 +125,12 @@ def _migrate(db):
         except Exception:
             pass  # column already exists
 
+    # Add magic_token to User (for magic link login)
+    try:
+        conn.execute("ALTER TABLE User ADD magic_token STRING DEFAULT ''")
+    except Exception:
+        pass  # column already exists
+
 
 def get_conn():
     db = get_database()

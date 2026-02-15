@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import os
+import secrets
 import time
 import uuid
 from datetime import datetime, timezone
@@ -92,26 +93,28 @@ def get_user_by_email(conn: kuzu.Connection, email: str) -> dict | None:
     email = email.strip().lower()
     result = conn.execute(
         "MATCH (u:User) WHERE u.email = $email "
-        "RETURN u.id, u.email, u.display_name, u.password_hash, u.is_admin, u.created_at",
+        "RETURN u.id, u.email, u.display_name, u.password_hash, u.is_admin, u.created_at, u.magic_token",
         {"email": email}
     )
     if result.has_next():
         row = result.get_next()
         return {"id": row[0], "email": row[1], "display_name": row[2],
-                "password_hash": row[3], "is_admin": row[4], "created_at": row[5]}
+                "password_hash": row[3], "is_admin": row[4], "created_at": row[5],
+                "magic_token": row[6] or ""}
     return None
 
 
 def get_user_by_id(conn: kuzu.Connection, user_id: str) -> dict | None:
     result = conn.execute(
         "MATCH (u:User) WHERE u.id = $id "
-        "RETURN u.id, u.email, u.display_name, u.password_hash, u.is_admin, u.created_at",
+        "RETURN u.id, u.email, u.display_name, u.password_hash, u.is_admin, u.created_at, u.magic_token",
         {"id": user_id}
     )
     if result.has_next():
         row = result.get_next()
         return {"id": row[0], "email": row[1], "display_name": row[2],
-                "password_hash": row[3], "is_admin": row[4], "created_at": row[5]}
+                "password_hash": row[3], "is_admin": row[4], "created_at": row[5],
+                "magic_token": row[6] or ""}
     return None
 
 
@@ -123,16 +126,74 @@ def count_users(conn: kuzu.Connection) -> int:
 
 
 def authenticate_user(conn: kuzu.Connection, email: str, password: str) -> dict | None:
-    """Verify email+password. Returns user dict (without password_hash) or None."""
+    """Verify email+password. Returns user dict (without password_hash/magic_token) or None."""
     user = get_user_by_email(conn, email)
     if not user:
         return None
     if not verify_password(password, user["password_hash"]):
         return None
-    return {k: v for k, v in user.items() if k != "password_hash"}
+    return {k: v for k, v in user.items() if k not in ("password_hash", "magic_token")}
+
+
+# ── Magic link helpers ──
+
+def generate_magic_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def create_user_invited(conn: kuzu.Connection, email: str, display_name: str) -> dict:
+    """Create a user account for an invited member (no password, with magic token)."""
+    email = email.strip().lower()
+    existing = get_user_by_email(conn, email)
+    if existing:
+        raise ValueError("A user with this email already exists")
+    uid = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    token = generate_magic_token()
+    conn.execute(
+        "CREATE (u:User {id: $id, email: $email, display_name: $name, "
+        "password_hash: '', is_admin: false, created_at: $ts, magic_token: $token})",
+        {"id": uid, "email": email, "name": display_name, "ts": now, "token": token}
+    )
+    return {"id": uid, "email": email, "display_name": display_name,
+            "is_admin": False, "created_at": now, "magic_token": token}
+
+
+def get_user_by_magic_token(conn: kuzu.Connection, token: str) -> dict | None:
+    """Look up a user by their magic login token."""
+    if not token:
+        return None
+    result = conn.execute(
+        "MATCH (u:User) WHERE u.magic_token = $token "
+        "RETURN u.id, u.email, u.display_name, u.is_admin, u.created_at",
+        {"token": token}
+    )
+    if result.has_next():
+        row = result.get_next()
+        return {"id": row[0], "email": row[1], "display_name": row[2],
+                "is_admin": row[3], "created_at": row[4]}
+    return None
+
+
+def ensure_magic_token(conn: kuzu.Connection, user_id: str) -> str:
+    """Ensure user has a magic token. Generate one if missing. Return the token."""
+    user = get_user_by_id(conn, user_id)
+    if not user:
+        raise ValueError("User not found")
+    if user.get("magic_token"):
+        return user["magic_token"]
+    token = generate_magic_token()
+    conn.execute(
+        "MATCH (u:User) WHERE u.id = $id SET u.magic_token = $token",
+        {"id": user_id, "token": token}
+    )
+    return token
 
 
 # ── FastAPI dependencies ──
+
+_PRIVATE_FIELDS = {"password_hash", "magic_token"}
+
 
 def get_current_user(request: Request, conn=Depends(get_conn)) -> dict:
     """FastAPI dependency: extract user from session cookie. Raises 401 if not authenticated."""
@@ -143,7 +204,7 @@ def get_current_user(request: Request, conn=Depends(get_conn)) -> dict:
     user = get_user_by_id(conn, user_id)
     if not user:
         raise HTTPException(401, "User not found")
-    return {k: v for k, v in user.items() if k != "password_hash"}
+    return {k: v for k, v in user.items() if k not in _PRIVATE_FIELDS}
 
 
 def get_optional_user(request: Request, conn=Depends(get_conn)) -> dict | None:
@@ -155,4 +216,4 @@ def get_optional_user(request: Request, conn=Depends(get_conn)) -> dict | None:
     user = get_user_by_id(conn, user_id)
     if not user:
         return None
-    return {k: v for k, v in user.items() if k != "password_hash"}
+    return {k: v for k, v in user.items() if k not in _PRIVATE_FIELDS}
