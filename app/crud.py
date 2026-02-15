@@ -209,16 +209,31 @@ def merge_person_into(conn: kuzu.Connection, keep_id: str, remove_id: str):
         changed = False
         sex = keep["sex"]
         notes = keep.get("notes") or ""
+        birth_date = keep.get("birth_date") or ""
+        death_date = keep.get("death_date") or ""
+        is_deceased = keep.get("is_deceased") or False
         if sex == "U" and remove["sex"] != "U":
             sex = remove["sex"]
             changed = True
         if not notes and remove.get("notes"):
             notes = remove["notes"]
             changed = True
+        if not birth_date and remove.get("birth_date"):
+            birth_date = remove["birth_date"]
+            changed = True
+        if not death_date and remove.get("death_date"):
+            death_date = remove["death_date"]
+            changed = True
+        if not is_deceased and remove.get("is_deceased"):
+            is_deceased = True
+            changed = True
         if changed:
             conn.execute(
-                "MATCH (p:Person) WHERE p.id = $id SET p.sex = $sex, p.notes = $notes",
-                {"id": keep_id, "sex": sex, "notes": notes}
+                "MATCH (p:Person) WHERE p.id = $id "
+                "SET p.sex = $sex, p.notes = $notes, "
+                "p.birth_date = $bd, p.death_date = $dd, p.is_deceased = $dec",
+                {"id": keep_id, "sex": sex, "notes": notes,
+                 "bd": birth_date, "dd": death_date, "dec": bool(is_deceased)}
             )
 
     # Transfer outgoing edges from remove to keep

@@ -568,6 +568,7 @@
     <div class="ctx-item" id="ctxAddSpouseItem" onclick="ctxAddSpouse()"><span class="ctx-icon">&#x1F48D;</span> Add Spouse</div>
     <div class="ctx-item" id="ctxAddSiblingItem" onclick="ctxAddSibling()"><span class="ctx-icon">&#x1F46C;</span> Add Sibling</div>
     <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="ctxMergePerson()"><span class="ctx-icon">&#x1F500;</span> Merge with...</div>
     <div class="ctx-item danger" onclick="ctxDeletePerson()"><span class="ctx-icon">&#10005;</span> Delete Person</div>
   </div>
   <div id="ctxEdge" class="ctx-menu">
@@ -819,6 +820,27 @@
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeModal('addPersonModal')">Cancel</button>
         <button class="btn-primary" onclick="saveModalPerson()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Merge Person Modal -->
+  <div id="mergePersonModal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="mergeModalTitle">Merge Person</h3>
+      <input type="hidden" id="mergePersonId">
+      <p style="font-size:13px;color:#666;margin-bottom:12px">Select the person to merge into. The selected person will be kept; "<span id="mergeRemoveName"></span>" will be removed and all their relationships transferred.</p>
+      <div class="form-group">
+        <label>Search</label>
+        <input type="text" id="mergeSearchInput" placeholder="Type a name..." oninput="onMergeSearchInput()">
+      </div>
+      <div class="form-group">
+        <label>Merge into</label>
+        <select id="mergeTargetSelect" size="8" style="width:100%; font-size:13px; border:1px solid #ccc; border-radius:4px"></select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('mergePersonModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveMergePerson()">Merge</button>
       </div>
     </div>
   </div>

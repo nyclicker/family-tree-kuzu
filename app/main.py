@@ -689,6 +689,32 @@ def tree_delete_comment(tree_id: str, person_id: str, comment_id: str,
     return {"ok": True}
 
 
+# ── Merge person endpoint ──
+
+class MergePersonRequest(BaseModel):
+    merge_into_id: str
+
+
+@app.post("/api/trees/{tree_id}/people/{person_id}/merge")
+def tree_merge_person(tree_id: str, person_id: str, body: MergePersonRequest,
+                      user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    """Merge person_id into merge_into_id: transfer all edges, keep merge_into_id, delete person_id."""
+    trees.require_role(conn, user["id"], tree_id, "editor")
+    if person_id == body.merge_into_id:
+        raise HTTPException(400, "Cannot merge a person into themselves")
+    keep = crud.get_person(conn, body.merge_into_id, tree_id)
+    remove = crud.get_person(conn, person_id, tree_id)
+    if not keep:
+        raise HTTPException(404, "Target person not found")
+    if not remove:
+        raise HTTPException(404, "Person to merge not found")
+    crud.merge_person_into(conn, body.merge_into_id, person_id)
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "merge", "person", body.merge_into_id,
+                            f'Merged "{remove["display_name"]}" into "{keep["display_name"]}"')
+    return {"ok": True, "kept": keep["display_name"], "removed": remove["display_name"]}
+
+
 # ── Changelog endpoint ──
 
 @app.get("/api/trees/{tree_id}/changelog")

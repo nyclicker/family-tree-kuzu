@@ -2168,6 +2168,87 @@ async function loadGraph() {
 }
 
 // ══════════════════════════════════════════════════════════
+// MERGE PERSON
+// ══════════════════════════════════════════════════════════
+
+function getParentNames(personId) {
+  if (!cy) return [];
+  const parents = [];
+  cy.edges().forEach(e => {
+    if (e.data('type') === 'PARENT_OF' && e.data('target') === personId) {
+      const parentNode = cy.getElementById(e.data('source'));
+      if (parentNode && parentNode.nonempty()) {
+        parents.push(parentNode.data('label'));
+      }
+    }
+  });
+  return parents;
+}
+
+function getPersonLabel(p) {
+  const parents = getParentNames(p.id);
+  if (parents.length > 0) {
+    return `${p.display_name} (${p.sex}) — child of ${parents.join(' & ')}`;
+  }
+  return `${p.display_name} (${p.sex})`;
+}
+
+function ctxMergePerson() {
+  hideAllMenus();
+  if (!ctxTargetNode || !canEdit()) return;
+  const personId = ctxTargetNode.data('id');
+  const personLabel = ctxTargetNode.data('label');
+  document.getElementById('mergePersonId').value = personId;
+  document.getElementById('mergeRemoveName').textContent = personLabel;
+  document.getElementById('mergeModalTitle').textContent = `Merge "${personLabel}"`;
+  document.getElementById('mergeSearchInput').value = '';
+  populateMergeSelect('');
+  openModal('mergePersonModal');
+}
+
+function onMergeSearchInput() {
+  const query = document.getElementById('mergeSearchInput').value.trim();
+  populateMergeSelect(query);
+}
+
+function populateMergeSelect(query) {
+  const personId = document.getElementById('mergePersonId').value;
+  const q = (query || '').toLowerCase();
+  const filtered = people.filter(p => p.id !== personId && (!q || p.display_name.toLowerCase().includes(q)));
+  const sel = document.getElementById('mergeTargetSelect');
+  sel.innerHTML = filtered.map(p => {
+    const label = getPersonLabel(p);
+    return `<option value="${p.id}">${escapeHtml(label)}</option>`;
+  }).join('');
+}
+
+async function saveMergePerson() {
+  if (!currentTreeId || !canEdit()) return;
+  const personId = document.getElementById('mergePersonId').value;
+  const targetId = document.getElementById('mergeTargetSelect').value;
+  if (!targetId) { alert('Select a person to merge into'); return; }
+  const removeName = document.getElementById('mergeRemoveName').textContent;
+  const keepPerson = people.find(p => p.id === targetId);
+  const keepName = keepPerson ? keepPerson.display_name : '?';
+  if (!confirm(`Merge "${removeName}" into "${keepName}"?\n\nAll relationships from "${removeName}" will be transferred to "${keepName}", and "${removeName}" will be deleted.\n\nThis cannot be undone.`)) return;
+  try {
+    const res = await fetch(treeApi(`/people/${personId}/merge`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merge_into_id: targetId })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Merge failed');
+    }
+    closeModal('mergePersonModal');
+    await refresh();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
 // CHANGE HISTORY
 // ══════════════════════════════════════════════════════════
 
