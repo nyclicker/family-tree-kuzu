@@ -9,9 +9,9 @@ def create_group(conn: kuzu.Connection, name: str, description: str,
     gid = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
-        "CREATE (g:UserGroup {id: $id, name: $name, descr: $desc, "
+        "CREATE (g:UserGroup {id: $id, name: $name, descr: $descr, "
         "created_by: $cb, created_at: $ts})",
-        {"id": gid, "name": name, "desc": description or "", "cb": created_by, "ts": now}
+        {"id": gid, "name": name, "descr": description or "", "cb": created_by, "ts": now}
     )
     return {"id": gid, "name": name, "description": description or "",
             "created_by": created_by, "created_at": now}
@@ -32,8 +32,8 @@ def get_group(conn: kuzu.Connection, group_id: str) -> dict | None:
 
 def update_group(conn: kuzu.Connection, group_id: str, name: str, description: str):
     conn.execute(
-        "MATCH (g:UserGroup) WHERE g.id = $id SET g.name = $name, g.descr = $desc",
-        {"id": group_id, "name": name, "desc": description or ""}
+        "MATCH (g:UserGroup) WHERE g.id = $id SET g.name = $name, g.descr = $descr",
+        {"id": group_id, "name": name, "descr": description or ""}
     )
 
 
