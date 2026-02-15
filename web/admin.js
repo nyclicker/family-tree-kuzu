@@ -142,6 +142,9 @@ async function selectGroup(gid) {
     document.getElementById('groupEditDesc').value = group.description || '';
   }
 
+  // Clear previous magic link display
+  const mlEl = document.getElementById('groupMemberMagicLink');
+  if (mlEl) { mlEl.className = 'magic-link-box'; mlEl.innerHTML = ''; }
   await Promise.all([loadGroupMembers(gid), loadGroupTrees(gid)]);
   populateGroupTreeSelect();
 }
@@ -249,8 +252,21 @@ async function addGroupMember() {
       showStatus('groupMemberStatus', err.detail || 'Failed to add member', true);
       return;
     }
+    const data = await res.json();
     document.getElementById('groupMemberEmail').value = '';
-    showStatus('groupMemberStatus', 'Member added', false);
+    // Show magic link for newly created or existing users
+    if (data.magic_link) {
+      const mlEl = document.getElementById('groupMemberMagicLink');
+      const label = data.created ? 'New user created. Share this login link:' : 'Member added. Login link:';
+      mlEl.innerHTML = `<strong>${label}</strong><br>
+        <input type="text" value="${escapeHtml(data.magic_link)}" readonly
+          style="width:100%;font-size:11px;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;background:#fff"
+          onclick="this.select()">
+        <button class="btn-primary btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(data.magic_link)}').then(()=>this.textContent='Copied!')" style="margin-top:4px">Copy Link</button>`;
+      mlEl.className = 'magic-link-box visible';
+    } else {
+      showStatus('groupMemberStatus', 'Member added', false);
+    }
     await loadGroupMembers(selectedGroupId);
   } catch (e) {
     showStatus('groupMemberStatus', 'Error: ' + e.message, true);

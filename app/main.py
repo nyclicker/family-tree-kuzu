@@ -400,15 +400,23 @@ def list_group_members(group_id: str, user=Depends(auth.get_current_user),
 
 
 @app.post("/api/groups/{group_id}/members")
-def add_group_member(group_id: str, body: schemas.GroupMemberAdd,
+def add_group_member(group_id: str, body: schemas.GroupMemberAdd, request: Request,
                      user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     if not groups.can_manage_group(conn, group_id, user["id"], user["is_admin"]):
         raise HTTPException(403, "Not authorized")
     target = auth.get_user_by_email(conn, body.email)
+    created = False
     if not target:
-        raise HTTPException(404, f"No user found with email {body.email}")
+        # Auto-create invited user (no password, with magic token)
+        display_name = body.email.split("@")[0]
+        target = auth.create_user_invited(conn, body.email, display_name)
+        created = True
     groups.add_member(conn, group_id, target["id"])
-    return {"ok": True, "user_id": target["id"]}
+    # Always return a magic link so admin can share it
+    token = auth.ensure_magic_token(conn, target["id"])
+    base_url = str(request.base_url).rstrip("/")
+    magic_link = f"{base_url}/auth/magic/{token}"
+    return {"ok": True, "user_id": target["id"], "magic_link": magic_link, "created": created}
 
 
 @app.delete("/api/groups/{group_id}/members/{uid}")

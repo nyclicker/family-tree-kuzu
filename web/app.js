@@ -1824,7 +1824,7 @@ function renderMembers(data) {
   if (data.owner) {
     html += `<div class="member-item">
       <div class="member-info">
-        <div class="member-email">${escapeHtml(data.owner.email)}</div>
+        <div class="member-email">${escapeHtml(data.owner.display_name || data.owner.email)}</div>
         <div class="member-role">Owner</div>
       </div>
     </div>`;
@@ -1834,16 +1834,8 @@ function renderMembers(data) {
   for (const u of (data.users || [])) {
     html += `<div class="member-item">
       <div class="member-info">
-        <div class="member-email">${escapeHtml(u.email)}</div>
-        <div class="member-role">${u.display_name ? escapeHtml(u.display_name) + ' — ' : ''}${u.role}</div>
-      </div>
-      <div class="member-actions">
-        <button class="magic-link-btn" onclick="getMagicLink('${u.id}')" title="Get magic login link">&#x1F517;</button>
-        <select onchange="updateMemberRole('${u.id}', this.value)">
-          <option value="viewer"${u.role === 'viewer' ? ' selected' : ''}>Viewer</option>
-          <option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option>
-        </select>
-        <span onclick="removeMember('${u.id}')" style="color:#e74c3c;cursor:pointer;font-size:11px" title="Remove">&#10005;</span>
+        <div class="member-email">${escapeHtml(u.display_name || u.email)}</div>
+        <div class="member-role">${u.role}</div>
       </div>
     </div>`;
   }
@@ -1855,9 +1847,6 @@ function renderMembers(data) {
         <div class="member-email">[Group] ${escapeHtml(g.name)}</div>
         <div class="member-role">${g.role}</div>
       </div>
-      <div class="member-actions">
-        <span onclick="removeGroupAccess('${g.id}')" style="color:#e74c3c;cursor:pointer;font-size:11px" title="Remove">&#10005;</span>
-      </div>
     </div>`;
   }
 
@@ -1865,93 +1854,6 @@ function renderMembers(data) {
     html = '<div style="font-size:13px;color:#999">No members yet</div>';
   }
   el.innerHTML = html;
-}
-
-async function addTreeMember() {
-  if (!currentTreeId || !isOwner()) return;
-  const email = document.getElementById('memberEmail').value.trim();
-  const role = document.getElementById('memberRole').value;
-  if (!email) return;
-  try {
-    const res = await fetch(treeApi('/members'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, role })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.detail || 'Failed to add member');
-      return;
-    }
-    const data = await res.json();
-    document.getElementById('memberEmail').value = '';
-    await loadMembers();
-    if (data.magic_link) {
-      showMagicLinkModal(data.magic_link);
-    }
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
-}
-
-function showMagicLinkModal(link) {
-  document.getElementById('magicLinkUrl').value = link;
-  document.getElementById('magicLinkCopied').style.display = 'none';
-  openModal('magicLinkModal');
-}
-
-function copyMagicLink() {
-  const input = document.getElementById('magicLinkUrl');
-  navigator.clipboard.writeText(input.value).then(() => {
-    document.getElementById('magicLinkCopied').style.display = 'block';
-    setTimeout(() => { document.getElementById('magicLinkCopied').style.display = 'none'; }, 2000);
-  });
-}
-
-async function getMagicLink(userId) {
-  if (!currentTreeId || !isOwner()) return;
-  try {
-    const res = await fetch(treeApi(`/members/${userId}/magic-link`));
-    if (!res.ok) throw new Error('Failed to get magic link');
-    const data = await res.json();
-    showMagicLinkModal(data.magic_link);
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
-}
-
-async function updateMemberRole(userId, role) {
-  if (!currentTreeId || !isOwner()) return;
-  try {
-    await fetch(treeApi(`/members/${userId}`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role })
-    });
-    await loadMembers();
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
-}
-
-async function removeMember(userId) {
-  if (!confirm('Remove this member?')) return;
-  try {
-    await fetch(treeApi(`/members/${userId}`), { method: 'DELETE' });
-    await loadMembers();
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
-}
-
-async function removeGroupAccess(groupId) {
-  if (!confirm('Remove group access?')) return;
-  try {
-    await fetch(treeApi(`/groups/${groupId}`), { method: 'DELETE' });
-    await loadMembers();
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
 }
 
 // ── Export graph as image ──

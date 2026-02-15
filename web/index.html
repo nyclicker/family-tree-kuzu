@@ -444,17 +444,7 @@
         <div class="section" id="membersSection" style="display:none">
           <h2>Tree Members</h2>
           <div id="membersList"></div>
-          <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px">
-            <div style="font-size:12px; font-weight:600; color:#666; margin-bottom:6px; text-transform:uppercase">Add Member</div>
-            <div style="display:flex; gap:4px">
-              <input type="email" id="memberEmail" placeholder="user@email.com" style="flex:1; padding:6px 8px; font-size:13px; border:1px solid #ccc; border-radius:4px">
-              <select id="memberRole" style="padding:6px; font-size:12px; border:1px solid #ccc; border-radius:4px">
-                <option value="viewer">Viewer</option>
-                <option value="editor">Editor</option>
-              </select>
-              <button class="btn-success" onclick="addTreeMember()" style="padding:6px 10px; font-size:12px">Add</button>
-            </div>
-          </div>
+          <a href="/admin" id="manageInAdmin" style="display:inline-block;margin-top:8px;font-size:12px;color:#3498db;font-weight:600">Manage in Admin Panel</a>
         </div>
 
         <!-- Search & People List -->
@@ -759,22 +749,6 @@
     </div>
   </div>
 
-  <!-- Magic Link Modal -->
-  <div id="magicLinkModal" class="modal-overlay">
-    <div class="modal">
-      <h3>Magic Login Link</h3>
-      <p style="font-size:13px;color:#555;margin-bottom:12px">Share this link with the member so they can sign in without a password:</p>
-      <div style="display:flex;gap:4px;margin-bottom:8px">
-        <input type="text" id="magicLinkUrl" readonly style="flex:1;font-size:12px;background:#f9f9f9;cursor:text;padding:8px 10px;border:1px solid #ccc;border-radius:4px">
-        <button class="btn-primary" onclick="copyMagicLink()" style="padding:8px 12px;font-size:12px">Copy</button>
-      </div>
-      <div id="magicLinkCopied" style="font-size:12px;color:#27ae60;display:none">Copied to clipboard!</div>
-      <div class="modal-actions">
-        <button class="btn-secondary" onclick="closeModal('magicLinkModal')">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="/web/app.js?v=9"></script>
+  <script src="/web/app.js?v=10"></script>
 </body>
 </html>
