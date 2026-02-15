@@ -1045,20 +1045,23 @@ def viewer_page(token: str, conn=Depends(get_conn)):
 # UI ROUTES
 # ═══════════════════════════════════════════════════════════════
 
+_NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
+
+
 @app.get("/login", include_in_schema=False)
 def login_page():
-    return FileResponse("web/index.html")
+    return FileResponse("web/index.html", headers=_NO_CACHE)
 
 
 @app.get("/", include_in_schema=False)
 @app.head("/", include_in_schema=False)
 def ui():
-    return FileResponse("web/index.html")
+    return FileResponse("web/index.html", headers=_NO_CACHE)
 
 
 @app.get("/web/app.js", include_in_schema=False)
 def ui_js():
-    return FileResponse("web/app.js")
+    return FileResponse("web/app.js", headers=_NO_CACHE)
 
 
 @app.get("/logout", include_in_schema=False)
