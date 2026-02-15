@@ -390,13 +390,8 @@
           <p style="color:#666;font-size:13px;margin-bottom:12px">Create a new empty tree or import a family tree file.</p>
           <button class="btn-primary" onclick="openCreateTreeModal()" style="width:100%;margin-bottom:8px">Create Empty Tree</button>
           <div style="text-align:center;color:#999;font-size:12px;margin-bottom:8px">— or —</div>
-          <div style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;margin-bottom:4px">Import from Sample Data</div>
-          <div id="welcomeDatasetList" style="max-height:160px;overflow-y:auto;border:1px solid #eee;border-radius:4px;padding:4px 0;font-size:13px">
-            Loading...
-          </div>
-          <button class="btn-primary" onclick="loadSelectedDatasets(false)" style="width:100%;margin-top:8px">Import Selected</button>
-          <div class="form-group" style="margin-top:12px">
-            <label>Or Upload File (.csv, .txt, .db)</label>
+          <div class="form-group">
+            <label>Upload File (.csv, .txt, .db)</label>
             <div class="drop-zone" id="welcomeDropZone" onclick="document.getElementById('welcomeFileInput').click()">
               <span id="welcomeDropLabel">Click or drag a file here</span>
               <input type="file" id="welcomeFileInput" accept=".csv,.txt,.db" style="display:none" onchange="onFileSelected(this)">
@@ -417,18 +412,8 @@
         <!-- Dataset (import into selected tree) -->
         <div class="section" id="dataSection" style="display:none">
           <h2>Import Data</h2>
-          <div id="datasetPicker">
-            <div style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;margin-bottom:4px">Available Family Trees</div>
-            <div id="datasetList" style="max-height:200px;overflow-y:auto;border:1px solid #eee;border-radius:4px;padding:4px 0;font-size:13px">
-              Loading...
-            </div>
-            <div class="btn-row" style="margin-top:8px">
-              <button class="btn-primary" onclick="loadSelectedDatasets(false)">Load Selected</button>
-              <button class="btn-success" id="combineBtn" onclick="loadSelectedDatasets(true)" style="display:none" title="Add to current graph without clearing">+ Combine</button>
-            </div>
-          </div>
-          <div class="form-group" style="margin-top:12px">
-            <label>Or Upload File (.csv, .txt, .db)</label>
+          <div class="form-group">
+            <label>Upload File (.csv, .txt, .db)</label>
             <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
               <span id="dropLabel">Click or drag a file here</span>
               <input type="file" id="fileInput" accept=".csv,.txt,.db" style="display:none" onchange="onFileSelected(this)">

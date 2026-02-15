@@ -201,7 +201,6 @@ function initApp() {
   if (!appInitialized) {
     setupDropZone();
     setupWelcomeDropZone();
-    loadAvailableDatasets();
     appInitialized = true;
   }
   loadTrees();
@@ -297,8 +296,6 @@ function updateTreeUI() {
   const clearBtn = document.getElementById('clearBtn');
   if (saveBtn) saveBtn.style.display = hasTree ? 'inline-block' : 'none';
   if (clearBtn) clearBtn.style.display = hasTree && isOwner() ? 'inline-block' : 'none';
-  const combineBtn = document.getElementById('combineBtn');
-  if (combineBtn) combineBtn.style.display = hasTree && canEdit() ? 'inline-block' : 'none';
   // History button
   const historyBtn = document.getElementById('historyBtn');
   if (historyBtn) historyBtn.style.display = hasTree ? 'inline-block' : 'none';
@@ -490,38 +487,7 @@ async function addPerson() {
 }
 
 
-// ── Load Data: Dataset picker ──
-
-let availableDatasets = [];
-
-async function loadAvailableDatasets() {
-  try {
-    const res = await fetch('/api/datasets');
-    availableDatasets = await res.json();
-    renderDatasetPicker();
-  } catch (e) {
-    document.getElementById('datasetList').innerHTML = '<div style="padding:8px;color:#999">Could not load datasets</div>';
-  }
-}
-
-function renderDatasetPicker() {
-  const html = availableDatasets.length === 0
-    ? '<div style="padding:8px;color:#999">No data files found in /data</div>'
-    : availableDatasets.map((ds, i) =>
-        `<div class="ds-item" onclick="this.querySelector('input').click()"><input type="checkbox" id="ds_${i}" value="${escapeHtml(ds.filename)}" onclick="event.stopPropagation()"><span style="cursor:pointer;color:#333;font-size:13px">${escapeHtml(ds.name)}</span></div>`
-      ).join('');
-  const el = document.getElementById('datasetList');
-  if (el) el.innerHTML = html;
-  // Also populate welcome screen dataset list
-  const welcomeEl = document.getElementById('welcomeDatasetList');
-  if (welcomeEl) {
-    welcomeEl.innerHTML = availableDatasets.length === 0
-      ? '<div style="padding:8px;color:#999">No sample data available</div>'
-      : availableDatasets.map((ds, i) =>
-          `<div class="ds-item" onclick="this.querySelector('input').click()"><input type="checkbox" id="wds_${i}" value="${escapeHtml(ds.filename)}" onclick="event.stopPropagation()"><span style="cursor:pointer;color:#333;font-size:13px">${escapeHtml(ds.name)}</span></div>`
-        ).join('');
-  }
-}
+// ── Import helpers ──
 
 async function ensureTreeForImport(nameFallback) {
   if (currentTreeId) return currentTreeId;
@@ -537,34 +503,6 @@ async function ensureTreeForImport(nameFallback) {
   await loadTrees();
   selectTree(tree.id, 'owner');
   return tree.id;
-}
-
-async function loadSelectedDatasets(combine) {
-  let checkboxes = document.querySelectorAll('#datasetList input[type="checkbox"]:checked');
-  if (checkboxes.length === 0) {
-    checkboxes = document.querySelectorAll('#welcomeDatasetList input[type="checkbox"]:checked');
-  }
-  const files = Array.from(checkboxes).map(cb => cb.value);
-  if (files.length === 0) {
-    const statusId = userTrees.length === 0 ? 'welcomeLoadStatus' : 'loadStatus';
-    showStatus(statusId, 'Select at least one dataset', true);
-    return;
-  }
-  showStatus('loadStatus', 'Loading...', false);
-  try {
-    await ensureTreeForImport(files[0].replace(/\.[^.]+$/, ''));
-    const res = await fetch(treeApi('/import/dataset'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files, combine })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    showImportReport(data);
-    await refresh();
-  } catch (e) {
-    showStatus('loadStatus', 'Error: ' + e.message, true);
-  }
 }
 
 async function clearData() {
