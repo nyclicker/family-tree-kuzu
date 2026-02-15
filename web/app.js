@@ -376,7 +376,8 @@ function renderPeopleList(filter) {
       const re = new RegExp(`(${escapeRegex(query)})`, 'gi');
       name = name.replace(re, '<span class="match-highlight">$1</span>');
     }
-    return `<li class="${active}" data-id="${p.id}" onclick="navigateToPerson('${p.id}')"><span class="sex-badge">${p.sex}</span> ${name}</li>`;
+    const suffix = escapeHtml(getParentSuffix(p.id));
+    return `<li class="${active}" data-id="${p.id}" onclick="navigateToPerson('${p.id}')"><span class="sex-badge">${p.sex}</span> ${name}<span style="color:#999;font-size:11px">${suffix}</span></li>`;
   }).join('');
 }
 
@@ -1284,7 +1285,7 @@ function populateParentSelect(query) {
   const filtered = people.filter(p => p.id !== childId && (!q || p.display_name.toLowerCase().includes(q)));
   const sel = document.getElementById('parentExistingSelect');
   sel.innerHTML = filtered.map(p =>
-    `<option value="${p.id}">${escapeHtml(p.display_name)} (${p.sex})</option>`
+    `<option value="${p.id}">${escapeHtml(getPersonLabel(p))}</option>`
   ).join('');
 }
 
@@ -1384,7 +1385,7 @@ function populateSpouseSelect(query) {
   const filtered = people.filter(p => p.id !== personId && (!q || p.display_name.toLowerCase().includes(q)));
   const sel = document.getElementById('spouseExistingSelect');
   sel.innerHTML = filtered.map(p =>
-    `<option value="${p.id}">${escapeHtml(p.display_name)} (${p.sex})</option>`
+    `<option value="${p.id}">${escapeHtml(getPersonLabel(p))}</option>`
   ).join('');
 }
 
@@ -1600,7 +1601,8 @@ function onFindPersonInput() {
   const re = new RegExp(`(${escapeRegex(query)})`, 'gi');
   listEl.innerHTML = filtered.map(p => {
     const name = escapeHtml(p.display_name).replace(re, '<span class="match-highlight">$1</span>');
-    return `<li data-id="${p.id}" onclick="findPersonSelect('${p.id}')"><span class="sex-badge">${p.sex}</span> ${name}</li>`;
+    const suffix = escapeHtml(getParentSuffix(p.id));
+    return `<li data-id="${p.id}" onclick="findPersonSelect('${p.id}')"><span class="sex-badge">${p.sex}</span> ${name}<span style="color:#999;font-size:11px">${suffix}</span></li>`;
   }).join('');
 }
 
@@ -2123,12 +2125,14 @@ function getParentNames(personId) {
   return parents;
 }
 
+function getParentSuffix(personId) {
+  const parents = getParentNames(personId);
+  if (parents.length > 0) return ` — child of ${parents.join(' & ')}`;
+  return '';
+}
+
 function getPersonLabel(p) {
-  const parents = getParentNames(p.id);
-  if (parents.length > 0) {
-    return `${p.display_name} (${p.sex}) — child of ${parents.join(' & ')}`;
-  }
-  return `${p.display_name} (${p.sex})`;
+  return `${p.display_name} (${p.sex})${getParentSuffix(p.id)}`;
 }
 
 function ctxMergePerson() {
