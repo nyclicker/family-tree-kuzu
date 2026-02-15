@@ -149,6 +149,7 @@ let appInitialized = false;
 function initApp() {
   if (!appInitialized) {
     setupDropZone();
+    setupWelcomeDropZone();
     loadAvailableDatasets();
     appInitialized = true;
   }
@@ -214,12 +215,19 @@ function selectTree(treeId, role) {
 
 function updateTreeUI() {
   const hasTree = !!currentTreeId;
+  const hasTrees = userTrees.length > 0;
   // Header label
   const headerLabel = document.getElementById('datasetLabel');
   if (headerLabel) {
     const tree = userTrees.find(t => t.id === currentTreeId);
     headerLabel.textContent = tree ? ` — ${tree.name}` : '';
   }
+  // Welcome vs Tree selector
+  const welcomeSection = document.getElementById('welcomeSection');
+  const treeSection = document.getElementById('treeSection');
+  if (welcomeSection) welcomeSection.style.display = !hasTrees ? 'block' : 'none';
+  if (treeSection) treeSection.style.display = hasTrees ? 'block' : 'none';
+
   // Show/hide sections based on tree selection and role
   const dataSection = document.getElementById('dataSection');
   const addPersonSection = document.getElementById('addPersonSection');
@@ -428,26 +436,54 @@ async function loadAvailableDatasets() {
 }
 
 function renderDatasetPicker() {
+  const html = availableDatasets.length === 0
+    ? '<div style="padding:8px;color:#999">No data files found in /data</div>'
+    : availableDatasets.map((ds, i) =>
+        `<div class="ds-item" onclick="this.querySelector('input').click()"><input type="checkbox" id="ds_${i}" value="${escapeHtml(ds.filename)}" onclick="event.stopPropagation()"><span style="cursor:pointer;color:#333;font-size:13px">${escapeHtml(ds.name)}</span></div>`
+      ).join('');
   const el = document.getElementById('datasetList');
-  if (availableDatasets.length === 0) {
-    el.innerHTML = '<div style="padding:8px;color:#999">No data files found in /data</div>';
-    return;
+  if (el) el.innerHTML = html;
+  // Also populate welcome screen dataset list
+  const welcomeEl = document.getElementById('welcomeDatasetList');
+  if (welcomeEl) {
+    welcomeEl.innerHTML = availableDatasets.length === 0
+      ? '<div style="padding:8px;color:#999">No sample data available</div>'
+      : availableDatasets.map((ds, i) =>
+          `<div class="ds-item" onclick="this.querySelector('input').click()"><input type="checkbox" id="wds_${i}" value="${escapeHtml(ds.filename)}" onclick="event.stopPropagation()"><span style="cursor:pointer;color:#333;font-size:13px">${escapeHtml(ds.name)}</span></div>`
+        ).join('');
   }
-  el.innerHTML = availableDatasets.map((ds, i) =>
-    `<div class="ds-item" onclick="this.querySelector('input').click()"><input type="checkbox" id="ds_${i}" value="${escapeHtml(ds.filename)}" onclick="event.stopPropagation()"><span style="cursor:pointer;color:#333;font-size:13px">${escapeHtml(ds.name)}</span></div>`
-  ).join('');
+}
+
+async function ensureTreeForImport(nameFallback) {
+  if (currentTreeId) return currentTreeId;
+  // Auto-create a tree named after the import
+  const treeName = nameFallback || 'Imported Tree';
+  const res = await fetch('/api/trees', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: treeName })
+  });
+  if (!res.ok) throw new Error('Failed to create tree');
+  const tree = await res.json();
+  await loadTrees();
+  selectTree(tree.id, 'owner');
+  return tree.id;
 }
 
 async function loadSelectedDatasets(combine) {
-  if (!currentTreeId || !canEdit()) return;
-  const checkboxes = document.querySelectorAll('#datasetList input[type="checkbox"]:checked');
+  let checkboxes = document.querySelectorAll('#datasetList input[type="checkbox"]:checked');
+  if (checkboxes.length === 0) {
+    checkboxes = document.querySelectorAll('#welcomeDatasetList input[type="checkbox"]:checked');
+  }
   const files = Array.from(checkboxes).map(cb => cb.value);
   if (files.length === 0) {
-    showStatus('loadStatus', 'Select at least one dataset', true);
+    const statusId = userTrees.length === 0 ? 'welcomeLoadStatus' : 'loadStatus';
+    showStatus(statusId, 'Select at least one dataset', true);
     return;
   }
   showStatus('loadStatus', 'Loading...', false);
   try {
+    await ensureTreeForImport(files[0].replace(/\.[^.]+$/, ''));
     const res = await fetch(treeApi('/import/dataset'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -510,6 +546,19 @@ function setupDropZone() {
   });
 }
 
+function setupWelcomeDropZone() {
+  const zone = document.getElementById('welcomeDropZone');
+  if (!zone) return;
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  });
+}
+
 function onFileSelected(input) {
   const file = input.files[0];
   if (file) uploadFile(file);
@@ -517,7 +566,6 @@ function onFileSelected(input) {
 }
 
 async function uploadFile(file) {
-  if (!currentTreeId || !canEdit()) return;
   const ext = file.name.split('.').pop().toLowerCase();
   if (!['csv', 'txt', 'db'].includes(ext)) {
     showStatus('loadStatus', `Unsupported file type: .${ext}. Use .csv, .txt, or .db`, true);
@@ -526,6 +574,7 @@ async function uploadFile(file) {
   document.getElementById('dropLabel').textContent = `Importing ${file.name}...`;
   showStatus('loadStatus', 'Importing...', false);
   try {
+    await ensureTreeForImport(file.name.replace(/\.[^.]+$/, ''));
     const form = new FormData();
     form.append('file', file);
     const res = await fetch(treeApi('/import/upload'), { method: 'POST', body: form });

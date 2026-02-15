@@ -266,8 +266,29 @@
     </header>
     <div class="container">
       <div class="sidebar">
-        <!-- Tree Selector -->
-        <div class="section">
+        <!-- Welcome / Getting Started (shown when no trees exist) -->
+        <div class="section" id="welcomeSection" style="display:none">
+          <h2>Get Started</h2>
+          <p style="color:#666;font-size:13px;margin-bottom:12px">Create a new empty tree or import a family tree file.</p>
+          <button class="btn-primary" onclick="openCreateTreeModal()" style="width:100%;margin-bottom:8px">Create Empty Tree</button>
+          <div style="text-align:center;color:#999;font-size:12px;margin-bottom:8px">— or —</div>
+          <div style="font-size:12px;font-weight:600;color:#666;text-transform:uppercase;margin-bottom:4px">Import from Sample Data</div>
+          <div id="welcomeDatasetList" style="max-height:160px;overflow-y:auto;border:1px solid #eee;border-radius:4px;padding:4px 0;font-size:13px">
+            Loading...
+          </div>
+          <button class="btn-primary" onclick="loadSelectedDatasets(false)" style="width:100%;margin-top:8px">Import Selected</button>
+          <div class="form-group" style="margin-top:12px">
+            <label>Or Upload File (.csv, .txt, .db)</label>
+            <div class="drop-zone" id="welcomeDropZone" onclick="document.getElementById('welcomeFileInput').click()">
+              <span id="welcomeDropLabel">Click or drag a file here</span>
+              <input type="file" id="welcomeFileInput" accept=".csv,.txt,.db" style="display:none" onchange="onFileSelected(this)">
+            </div>
+          </div>
+          <div id="welcomeLoadStatus" class="status"></div>
+        </div>
+
+        <!-- Tree Selector (shown when trees exist) -->
+        <div class="section" id="treeSection" style="display:none">
           <h2>My Trees</h2>
           <ul id="treeList" class="tree-list">
             <li style="color:#999;padding:8px">Loading...</li>
