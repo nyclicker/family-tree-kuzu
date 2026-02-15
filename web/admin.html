@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Family Tree</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F333;</text></svg>">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #2c3e50; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 22px; font-weight: 600; }
+    header h1 a { color: white; text-decoration: none; }
+    header h1 a:hover { text-decoration: underline; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .btn-header {
+      padding: 6px 14px; font-size: 12px; font-weight: 600;
+      background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 4px; cursor: pointer; transition: background 0.15s; text-decoration: none;
+    }
+    .btn-header:hover { background: rgba(255,255,255,0.25); }
+    .user-info { display: flex; align-items: center; gap: 12px; }
+    .user-email { font-size: 12px; color: rgba(255,255,255,0.7); }
+
+    /* Tabs */
+    .tabs { display: flex; background: white; border-bottom: 2px solid #ddd; padding: 0 24px; }
+    .tab {
+      padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+      border-bottom: 3px solid transparent; color: #666; transition: all 0.2s;
+    }
+    .tab:hover { color: #2c3e50; }
+    .tab.active { color: #2c3e50; border-bottom-color: #3498db; }
+
+    /* Layout */
+    .admin-content { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card h3 { font-size: 16px; color: #2c3e50; margin-bottom: 12px; }
+
+    /* Buttons */
+    button {
+      padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;
+      font-size: 13px; font-weight: 600; transition: background 0.2s;
+    }
+    .btn-primary { background: #3498db; color: white; }
+    .btn-primary:hover { background: #2980b9; }
+    .btn-success { background: #27ae60; color: white; }
+    .btn-success:hover { background: #219a52; }
+    .btn-danger { background: #e74c3c; color: white; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-secondary { background: #ecf0f1; color: #333; }
+    .btn-secondary:hover { background: #dfe6e9; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* Forms */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+    }
+    .form-inline { display: flex; gap: 8px; align-items: flex-end; }
+    .form-inline .form-group { margin-bottom: 0; flex: 1; }
+
+    /* Lists */
+    .list-item {
+      padding: 10px 12px; border-bottom: 1px solid #eee;
+      display: flex; justify-content: space-between; align-items: center;
+      transition: background 0.1s; cursor: pointer;
+    }
+    .list-item:hover { background: #f8f9fa; }
+    .list-item.active { background: #ebf5fb; border-left: 3px solid #3498db; }
+    .list-item:last-child { border-bottom: none; }
+    .list-item-info { flex: 1; }
+    .list-item-title { font-weight: 600; font-size: 14px; color: #2c3e50; }
+    .list-item-sub { font-size: 12px; color: #999; margin-top: 2px; }
+    .list-item-actions { display: flex; gap: 6px; align-items: center; }
+
+    /* Two column layout */
+    .split-layout { display: flex; gap: 20px; }
+    .split-left { width: 320px; min-width: 320px; }
+    .split-right { flex: 1; }
+
+    /* Badges */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-viewer { background: #dfe6e9; color: #636e72; }
+    .badge-editor { background: #dff9fb; color: #0984e3; }
+    .badge-owner { background: #ffeaa7; color: #d35400; }
+    .badge-admin { background: #fab1a0; color: #d63031; }
+
+    /* Status message */
+    .status-msg {
+      padding: 8px 12px; border-radius: 4px; font-size: 13px; margin-top: 8px; display: none;
+    }
+    .status-msg.success { display: block; background: #d4edda; color: #155724; }
+    .status-msg.error { display: block; background: #f8d7da; color: #721c24; }
+
+    /* Magic link display */
+    .magic-link-box {
+      display: none; margin-top: 8px; padding: 10px; background: #f0f7ff;
+      border: 1px solid #3498db; border-radius: 4px; font-size: 12px; word-break: break-all;
+    }
+    .magic-link-box.visible { display: block; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; z-index: 2000; inset: 0;
+      background: rgba(0,0,0,0.4); align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 8px; padding: 24px; width: 420px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .modal h3 { margin-bottom: 16px; font-size: 17px; color: #2c3e50; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+    /* Sub-section */
+    .sub-section { margin-top: 16px; }
+    .sub-section h4 {
+      font-size: 13px; color: #2c3e50; margin-bottom: 8px;
+      border-bottom: 1px solid #eee; padding-bottom: 4px; text-transform: uppercase;
+    }
+    .sub-list { max-height: 250px; overflow-y: auto; }
+
+    .remove-btn {
+      color: #e74c3c; cursor: pointer; font-size: 14px; background: none; border: none;
+      padding: 2px 6px; font-weight: bold;
+    }
+    .remove-btn:hover { background: #fdf0ef; border-radius: 4px; }
+
+    select.role-select { padding: 4px 8px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; }
+
+    .empty-msg { color: #999; font-size: 13px; padding: 8px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="/">Family Tree</a> &mdash; Admin</h1>
+    <div class="header-actions">
+      <div class="user-info">
+        <span class="user-email" id="userEmail"></span>
+        <a href="/" class="btn-header">Back to App</a>
+        <button class="btn-header" onclick="doLogout()">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="groups" onclick="switchTab('groups')">Groups</div>
+    <div class="tab" data-tab="users" onclick="switchTab('users')">Users</div>
+    <div class="tab" data-tab="trees" onclick="switchTab('trees')">Tree Access</div>
+  </div>
+
+  <div class="admin-content">
+    <!-- ═══ GROUPS TAB ═══ -->
+    <div class="panel active" id="panelGroups">
+      <div class="split-layout">
+        <div class="split-left">
+          <div class="card">
+            <h3>Groups</h3>
+            <div id="groupList"><div class="empty-msg">Loading...</div></div>
+            <button class="btn-primary" onclick="openCreateGroupModal()" style="margin-top:12px">+ Create Group</button>
+          </div>
+        </div>
+        <div class="split-right">
+          <div id="groupDetail" style="display:none">
+            <div class="card">
+              <h3 id="groupDetailName">Group Details</h3>
+              <div class="form-inline" style="margin-bottom:12px">
+                <div class="form-group">
+                  <label>Name</label>
+                  <input type="text" id="groupEditName">
+                </div>
+                <div class="form-group" style="flex:2">
+                  <label>Description</label>
+                  <input type="text" id="groupEditDesc">
+                </div>
+                <button class="btn-primary btn-sm" onclick="saveGroupDetails()" style="align-self:flex-end">Save</button>
+                <button class="btn-danger btn-sm" onclick="deleteSelectedGroup()" style="align-self:flex-end">Delete</button>
+              </div>
+            </div>
+
+            <!-- Members sub-section -->
+            <div class="card">
+              <div class="sub-section" style="margin-top:0">
+                <h4>Members</h4>
+                <div id="groupMembersList" class="sub-list"></div>
+                <div class="form-inline" style="margin-top:8px">
+                  <div class="form-group">
+                    <input type="email" id="groupMemberEmail" placeholder="user@email.com">
+                  </div>
+                  <button class="btn-success btn-sm" onclick="addGroupMember()">Add</button>
+                </div>
+                <div id="groupMemberStatus" class="status-msg"></div>
+              </div>
+            </div>
+
+            <!-- Trees sub-section -->
+            <div class="card">
+              <div class="sub-section" style="margin-top:0">
+                <h4>Tree Access</h4>
+                <div id="groupTreesList" class="sub-list"></div>
+                <div class="form-inline" style="margin-top:8px">
+                  <div class="form-group">
+                    <select id="groupTreeSelect">
+                      <option value="">Select a tree...</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="flex:0.5">
+                    <select id="groupTreeRole" class="role-select">
+                      <option value="viewer">Viewer</option>
+                      <option value="editor">Editor</option>
+                    </select>
+                  </div>
+                  <button class="btn-success btn-sm" onclick="assignGroupTree()">Assign</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="groupPlaceholder" class="card" style="text-align:center;color:#999;padding:40px">
+            Select a group to manage its members and tree access.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ USERS TAB ═══ -->
+    <div class="panel" id="panelUsers">
+      <div class="split-layout">
+        <div class="split-left">
+          <div class="card">
+            <h3>All Users</h3>
+            <div id="userList"><div class="empty-msg">Loading...</div></div>
+            <button class="btn-primary" onclick="openCreateUserModal()" style="margin-top:12px">+ Create User</button>
+          </div>
+        </div>
+        <div class="split-right">
+          <div id="userDetail" style="display:none">
+            <div class="card">
+              <h3 id="userDetailTitle">User Details</h3>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="userDetailEmail" readonly style="background:#f5f5f5">
+              </div>
+              <div class="form-inline">
+                <div class="form-group">
+                  <label>Display Name</label>
+                  <input type="text" id="userDetailName">
+                </div>
+                <button class="btn-primary btn-sm" onclick="saveUserDetails()" style="align-self:flex-end">Save</button>
+              </div>
+              <div style="margin-top:12px">
+                <button class="btn-secondary btn-sm" onclick="getUserMagicLink()">Get Magic Link</button>
+                <div id="userMagicLink" class="magic-link-box"></div>
+              </div>
+              <div id="userDetailStatus" class="status-msg"></div>
+            </div>
+            <div class="card">
+              <div class="sub-section" style="margin-top:0">
+                <h4>Group Memberships</h4>
+                <div id="userGroupsList" class="sub-list"></div>
+              </div>
+            </div>
+          </div>
+          <div id="userPlaceholder" class="card" style="text-align:center;color:#999;padding:40px">
+            Select a user to view details and manage their profile.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TREE ACCESS TAB ═══ -->
+    <div class="panel" id="panelTrees">
+      <div class="split-layout">
+        <div class="split-left">
+          <div class="card">
+            <h3>All Trees</h3>
+            <div id="adminTreeList"><div class="empty-msg">Loading...</div></div>
+          </div>
+        </div>
+        <div class="split-right">
+          <div id="treeDetail" style="display:none">
+            <div class="card">
+              <h3 id="treeDetailName">Tree Details</h3>
+            </div>
+            <!-- Groups with access -->
+            <div class="card">
+              <div class="sub-section" style="margin-top:0">
+                <h4>Groups with Access</h4>
+                <div id="treeGroupsList" class="sub-list"></div>
+              </div>
+            </div>
+            <!-- Individual user overrides -->
+            <div class="card">
+              <div class="sub-section" style="margin-top:0">
+                <h4>Individual User Overrides</h4>
+                <div id="treeUsersList" class="sub-list"></div>
+                <div class="form-inline" style="margin-top:8px">
+                  <div class="form-group">
+                    <input type="email" id="treeUserEmail" placeholder="user@email.com">
+                  </div>
+                  <div class="form-group" style="flex:0.5">
+                    <select id="treeUserRole" class="role-select">
+                      <option value="viewer">Viewer</option>
+                      <option value="editor">Editor</option>
+                    </select>
+                  </div>
+                  <button class="btn-success btn-sm" onclick="addTreeUserOverride()">Add</button>
+                </div>
+                <div id="treeUserStatus" class="status-msg"></div>
+              </div>
+            </div>
+          </div>
+          <div id="treePlaceholder" class="card" style="text-align:center;color:#999;padding:40px">
+            Select a tree to view its access configuration.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Group Modal -->
+  <div id="createGroupModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Create Group</h3>
+      <div class="form-group">
+        <label>Group Name</label>
+        <input type="text" id="newGroupName" placeholder="e.g. Family Editors">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="newGroupDesc" placeholder="Optional description">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('createGroupModal')">Cancel</button>
+        <button class="btn-primary" onclick="createGroup()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create User Modal -->
+  <div id="createUserModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Create User</h3>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="newUserEmail" placeholder="user@example.com">
+      </div>
+      <div class="form-group">
+        <label>Display Name</label>
+        <input type="text" id="newUserDisplayName" placeholder="Full Name">
+      </div>
+      <div id="createUserMagicLink" class="magic-link-box"></div>
+      <div id="createUserStatus" class="status-msg"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeCreateUserModal()">Close</button>
+        <button class="btn-primary" id="createUserBtn" onclick="createUser()">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/web/admin.js?v=1"></script>
+</body>
+</html>

@@ -118,3 +118,16 @@ class GroupOut(BaseModel):
 
 class GroupMemberAdd(BaseModel):
     email: str
+
+# ── Admin ──
+
+class AdminUserCreate(BaseModel):
+    email: str
+    display_name: str
+
+class AdminUserUpdate(BaseModel):
+    display_name: str
+
+class GroupTreeAssign(BaseModel):
+    tree_id: str
+    role: Literal["editor", "viewer"] = "viewer"

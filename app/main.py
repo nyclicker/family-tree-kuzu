@@ -428,6 +428,119 @@ def list_group_trees(group_id: str, user=Depends(auth.get_current_user),
     return groups.list_group_trees(conn, group_id)
 
 
+@app.post("/api/groups/{group_id}/trees")
+def assign_group_tree(group_id: str, body: schemas.GroupTreeAssign,
+                      user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    if not groups.can_manage_group(conn, group_id, user["id"], user["is_admin"]):
+        raise HTTPException(403, "Not authorized")
+    group = groups.get_group(conn, group_id)
+    if not group:
+        raise HTTPException(404, "Group not found")
+    tree = trees.get_tree(conn, body.tree_id)
+    if not tree:
+        raise HTTPException(404, "Tree not found")
+    trees.grant_group_access(conn, body.tree_id, group_id, body.role)
+    return {"ok": True}
+
+
+@app.put("/api/groups/{group_id}/trees/{tree_id}")
+def update_group_tree(group_id: str, tree_id: str, body: schemas.TreeGroupUpdate,
+                      user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    if not groups.can_manage_group(conn, group_id, user["id"], user["is_admin"]):
+        raise HTTPException(403, "Not authorized")
+    trees.update_group_access(conn, tree_id, group_id, body.role)
+    return {"ok": True}
+
+
+@app.delete("/api/groups/{group_id}/trees/{tree_id}")
+def remove_group_tree(group_id: str, tree_id: str,
+                      user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    if not groups.can_manage_group(conn, group_id, user["id"], user["is_admin"]):
+        raise HTTPException(403, "Not authorized")
+    trees.revoke_group_access(conn, tree_id, group_id)
+    return {"ok": True}
+
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN ENDPOINTS (admin-only)
+# ═══════════════════════════════════════════════════════════════
+
+def _require_admin(user):
+    if not user.get("is_admin"):
+        raise HTTPException(403, "Admin access required")
+
+
+@app.get("/api/admin/users")
+def admin_list_users(user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    _require_admin(user)
+    result = conn.execute(
+        "MATCH (u:User) RETURN u.id, u.email, u.display_name, u.is_admin, u.created_at "
+        "ORDER BY u.email"
+    )
+    users = []
+    while result.has_next():
+        row = result.get_next()
+        users.append({"id": row[0], "email": row[1], "display_name": row[2],
+                       "is_admin": row[3], "created_at": row[4]})
+    return users
+
+
+@app.post("/api/admin/users")
+def admin_create_user(body: schemas.AdminUserCreate, request: Request,
+                      user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    _require_admin(user)
+    existing = auth.get_user_by_email(conn, body.email)
+    if existing:
+        raise HTTPException(400, "A user with this email already exists")
+    new_user = auth.create_user_invited(conn, body.email, body.display_name)
+    token = new_user.get("magic_token", "")
+    base_url = str(request.base_url).rstrip("/")
+    magic_link = f"{base_url}/auth/magic/{token}" if token else ""
+    return {"id": new_user["id"], "email": new_user["email"],
+            "display_name": new_user["display_name"], "is_admin": new_user["is_admin"],
+            "created_at": new_user["created_at"], "magic_link": magic_link}
+
+
+@app.put("/api/admin/users/{uid}")
+def admin_update_user(uid: str, body: schemas.AdminUserUpdate,
+                      user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    _require_admin(user)
+    target = auth.get_user_by_id(conn, uid)
+    if not target:
+        raise HTTPException(404, "User not found")
+    conn.execute(
+        "MATCH (u:User) WHERE u.id = $id SET u.display_name = $name",
+        {"id": uid, "name": body.display_name}
+    )
+    return {"ok": True}
+
+
+@app.get("/api/admin/users/{uid}/magic-link")
+def admin_get_magic_link(uid: str, request: Request,
+                         user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    _require_admin(user)
+    target = auth.get_user_by_id(conn, uid)
+    if not target:
+        raise HTTPException(404, "User not found")
+    token = auth.ensure_magic_token(conn, uid)
+    base_url = str(request.base_url).rstrip("/")
+    return {"magic_link": f"{base_url}/auth/magic/{token}"}
+
+
+@app.get("/api/admin/trees")
+def admin_list_all_trees(user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    """Admin-only: list ALL trees in the system."""
+    _require_admin(user)
+    result = conn.execute(
+        "MATCH (t:FamilyTree) RETURN t.id, t.name, t.created_at ORDER BY t.name"
+    )
+    all_trees = []
+    while result.has_next():
+        row = result.get_next()
+        all_trees.append({"id": row[0], "name": row[1], "created_at": row[2]})
+    return all_trees
+
+
 # ═══════════════════════════════════════════════════════════════
 # TREE-SCOPED DATA ENDPOINTS
 # ═══════════════════════════════════════════════════════════════
@@ -1096,6 +1209,16 @@ def ui():
 @app.get("/web/app.js", include_in_schema=False)
 def ui_js():
     return FileResponse("web/app.js", headers=_NO_CACHE)
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_page():
+    return FileResponse("web/admin.html", headers=_NO_CACHE)
+
+
+@app.get("/web/admin.js", include_in_schema=False)
+def admin_js():
+    return FileResponse("web/admin.js", headers=_NO_CACHE)
 
 
 @app.get("/logout", include_in_schema=False)

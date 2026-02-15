@@ -107,6 +107,8 @@ function showApp() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
   document.getElementById('userEmail').textContent = currentUser.email;
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) adminBtn.style.display = currentUser.is_admin ? 'inline-block' : 'none';
   initApp();
 }
 
