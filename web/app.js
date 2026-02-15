@@ -29,6 +29,26 @@ const sessionCommentIds = new Set();
 // Track cursor position on the graph canvas for placing new nodes
 let lastCtxPosition = null;
 
+// ── Sidebar toggle ──
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const collapsed = sidebar.classList.toggle('collapsed');
+  overlay.classList.toggle('open', !collapsed);
+  localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '');
+}
+
+function initSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const isMobile = window.innerWidth <= 768;
+  const saved = localStorage.getItem('sidebarCollapsed');
+  // On mobile, default collapsed; on desktop, respect saved preference
+  if (isMobile || saved === '1') {
+    sidebar.classList.add('collapsed');
+  }
+}
+
 // ── API URL helper ──
 
 function treeApi(path) {
@@ -109,6 +129,7 @@ function showApp() {
   document.getElementById('userEmail').textContent = currentUser.email;
   const adminBtn = document.getElementById('adminBtn');
   if (adminBtn) adminBtn.style.display = currentUser.is_admin ? 'inline-block' : 'none';
+  initSidebar();
   initApp();
 }
 
