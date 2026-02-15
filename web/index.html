@@ -261,6 +261,55 @@
     .deceased-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .deceased-row input[type="checkbox"] { margin: 0; }
     .deceased-row label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; margin: 0; }
+
+    /* History panel */
+    .history-panel {
+      display: none; position: absolute; top: 0; right: 0; bottom: 0; width: 340px;
+      background: white; border-left: 1px solid #ddd; z-index: 20;
+      overflow-y: auto; box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+    }
+    .history-panel.open { display: block; }
+    .history-panel-header {
+      padding: 16px 20px; border-bottom: 1px solid #eee;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .history-panel-header h3 { font-size: 15px; color: #2c3e50; margin: 0; }
+    .history-panel-close {
+      background: none; border: none; font-size: 18px; cursor: pointer;
+      color: #999; padding: 4px 8px; border-radius: 4px;
+    }
+    .history-panel-close:hover { background: #f0f0f0; color: #333; }
+    .history-list { padding: 0; }
+    .history-item {
+      padding: 12px 20px; border-bottom: 1px solid #f0f0f0;
+      font-size: 13px; transition: background 0.1s;
+    }
+    .history-item:hover { background: #f9f9f9; }
+    .history-item .history-action {
+      font-weight: 600; color: #2c3e50; margin-bottom: 2px;
+    }
+    .history-item .history-details { color: #555; font-size: 12px; }
+    .history-item .history-meta {
+      color: #999; font-size: 11px; margin-top: 4px;
+      display: flex; justify-content: space-between;
+    }
+    .history-action-badge {
+      display: inline-block; padding: 1px 6px; border-radius: 3px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; color: white;
+      margin-right: 4px;
+    }
+    .badge-create { background: #27ae60; }
+    .badge-update { background: #2980b9; }
+    .badge-delete { background: #e74c3c; }
+    .badge-merge { background: #8e44ad; }
+    .badge-import { background: #e67e22; }
+    .history-load-more {
+      display: block; width: 100%; padding: 12px; text-align: center;
+      font-size: 13px; color: #3498db; background: none; border: none;
+      border-top: 1px solid #eee; cursor: pointer;
+    }
+    .history-load-more:hover { background: #f0f7ff; }
+    .history-empty { padding: 40px 20px; text-align: center; color: #999; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -322,6 +371,7 @@
             Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed line = Spouse &nbsp; Dashed border = Deceased
           </span>
         </div>
+        <button class="btn-header" id="historyBtn" onclick="toggleHistoryPanel()" style="display:none" title="View change history">&#128339; History</button>
         <button class="btn-header" id="exportPngBtn" onclick="exportGraphPng()" style="display:none" title="Download graph as PNG image">Export PNG</button>
         <button class="btn-header" id="exportSvgBtn" onclick="exportGraphSvg()" style="display:none" title="Download graph as SVG image">Export SVG</button>
         <div class="user-info">
@@ -495,6 +545,16 @@
           <div>No family members yet</div>
           <p>Select a tree, then add people or import data.</p>
         </div>
+      </div>
+      <div class="history-panel" id="historyPanel">
+        <div class="history-panel-header">
+          <h3>Change History</h3>
+          <button class="history-panel-close" onclick="toggleHistoryPanel()" title="Close">&times;</button>
+        </div>
+        <div id="historyList" class="history-list">
+          <div class="history-empty">No changes recorded yet</div>
+        </div>
+        <button class="history-load-more" id="historyLoadMore" onclick="loadMoreHistory()" style="display:none">Load more...</button>
       </div>
     </div>
   </div>
@@ -778,6 +838,6 @@
     </div>
   </div>
 
-  <script src="/web/app.js?v=11"></script>
+  <script src="/web/app.js?v=12"></script>
 </body>
 </html>

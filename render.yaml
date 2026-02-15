@@ -13,3 +13,7 @@ services:
         value: "8080"
       - key: DB_PATH
         value: "/data/graph_data"
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: SETUP_TOKEN
+        generateValue: true

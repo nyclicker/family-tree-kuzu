@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, Response, HTMLResponse, RedirectResp
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from .db import get_database, get_conn
-from . import crud, schemas, graph, sharing, trees, groups, auth
+from . import crud, schemas, graph, sharing, trees, groups, auth, changelog
 from .importer import import_csv_text, import_db_file
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -564,20 +564,29 @@ def tree_people(tree_id: str, user=Depends(auth.get_current_user),
 def tree_add_person(tree_id: str, body: schemas.PersonCreate,
                     user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
-    return crud.create_person(conn, body.display_name, body.sex, body.notes, tree_id=tree_id,
-                              birth_date=body.birth_date, death_date=body.death_date,
-                              is_deceased=body.is_deceased)
+    p = crud.create_person(conn, body.display_name, body.sex, body.notes, tree_id=tree_id,
+                           birth_date=body.birth_date, death_date=body.death_date,
+                           is_deceased=body.is_deceased)
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "create", "person", p["id"],
+                            f'Added "{body.display_name}"')
+    return p
 
 
 @app.put("/api/trees/{tree_id}/people/{person_id}", response_model=schemas.PersonOut)
 def tree_update_person(tree_id: str, person_id: str, body: schemas.PersonUpdate,
                        user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
+    old = crud.get_person(conn, person_id, tree_id)
     p = crud.update_person(conn, person_id, body.display_name, body.sex, body.notes,
                            tree_id=tree_id, birth_date=body.birth_date,
                            death_date=body.death_date, is_deceased=body.is_deceased)
     if not p:
         raise HTTPException(404, "Person not found")
+    old_name = old["display_name"] if old else "?"
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "update", "person", person_id,
+                            f'Updated "{old_name}"')
     return p
 
 
@@ -585,7 +594,12 @@ def tree_update_person(tree_id: str, person_id: str, body: schemas.PersonUpdate,
 def tree_delete_person(tree_id: str, person_id: str,
                        user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
+    person = crud.get_person(conn, person_id, tree_id)
+    name = person["display_name"] if person else "?"
     crud.delete_person(conn, person_id, tree_id=tree_id)
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "delete", "person", person_id,
+                            f'Deleted "{name}"')
     return {"ok": True}
 
 
@@ -675,6 +689,15 @@ def tree_delete_comment(tree_id: str, person_id: str, comment_id: str,
     return {"ok": True}
 
 
+# ── Changelog endpoint ──
+
+@app.get("/api/trees/{tree_id}/changelog")
+def tree_changelog(tree_id: str, limit: int = 50, offset: int = 0,
+                   user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    trees.require_role(conn, user["id"], tree_id, "viewer")
+    return changelog.list_changes(conn, tree_id, limit=limit, offset=offset)
+
+
 @app.post("/api/trees/{tree_id}/relationships")
 def tree_add_rel(tree_id: str, body: schemas.RelCreate,
                  user=Depends(auth.get_current_user), conn=Depends(get_conn)):
@@ -691,6 +714,13 @@ def tree_add_rel(tree_id: str, body: schemas.RelCreate,
         if to_spouses >= 1:
             raise HTTPException(400, "The other person already has a spouse.")
     result = crud.create_relationship(conn, body.from_person_id, body.to_person_id, body.type)
+    p1 = crud.get_person(conn, body.from_person_id)
+    p2 = crud.get_person(conn, body.to_person_id)
+    p1_name = p1["display_name"] if p1 else "?"
+    p2_name = p2["display_name"] if p2 else "?"
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "create", "relationship", result["id"],
+                            f'{body.type}: "{p1_name}" -> "{p2_name}"')
     if body.type == "SPOUSE_OF":
         merged = crud.merge_spouse_children(conn, body.from_person_id, body.to_person_id)
         if merged:
@@ -703,6 +733,9 @@ def tree_delete_rel(tree_id: str, rel_id: str,
                     user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
     crud.delete_relationship(conn, rel_id)
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "delete", "relationship", rel_id,
+                            "Deleted relationship")
     return {"ok": True}
 
 
@@ -747,6 +780,9 @@ def tree_import_dataset(tree_id: str, body: DatasetLoadRequest,
     all_people = len(crud.list_people(conn, tree_id=tree_id))
 
     name = ", ".join(dataset_names) if len(dataset_names) > 1 else (dataset_names[0] if dataset_names else "")
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "import", "tree", tree_id,
+                            f'Imported dataset "{name}": {all_people} people, {all_rels} relationships')
     return {
         "people": all_people, "relationships": all_rels,
         "auto_fixes": all_fixes, "errors": all_errors,
@@ -772,6 +808,9 @@ async def tree_import_upload(tree_id: str, file: UploadFile = File(...),
     _clean_display_names(conn, tree_id=tree_id)
     result["people"] = len(crud.list_people(conn, tree_id=tree_id))
     result["dataset_name"] = Path(name).stem
+    changelog.record_change(conn, tree_id, user["id"], user["display_name"],
+                            "import", "tree", tree_id,
+                            f'Imported file "{name}": {result["people"]} people, {result["relationships"]} relationships')
     return result
 
 

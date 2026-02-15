@@ -83,6 +83,15 @@ def _init_schema(db):
         "PRIMARY KEY(id))"
     )
 
+    # ── TreeChange (audit log) ──
+    conn.execute(
+        "CREATE NODE TABLE IF NOT EXISTS TreeChange("
+        "id STRING, tree_id STRING, user_id STRING, user_name STRING, "
+        "action STRING, entity_type STRING, entity_id STRING, "
+        "details STRING, created_at STRING, "
+        "PRIMARY KEY(id))"
+    )
+
     # ── Relationship tables for entitlements ──
     conn.execute(
         "CREATE REL TABLE IF NOT EXISTS OWNS("

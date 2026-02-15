@@ -299,6 +299,12 @@ function updateTreeUI() {
   if (clearBtn) clearBtn.style.display = hasTree && isOwner() ? 'inline-block' : 'none';
   const combineBtn = document.getElementById('combineBtn');
   if (combineBtn) combineBtn.style.display = hasTree && canEdit() ? 'inline-block' : 'none';
+  // History button
+  const historyBtn = document.getElementById('historyBtn');
+  if (historyBtn) historyBtn.style.display = hasTree ? 'inline-block' : 'none';
+  // Close history panel when switching trees
+  const historyPanel = document.getElementById('historyPanel');
+  if (historyPanel) historyPanel.classList.remove('open');
 }
 
 function openCreateTreeModal() {
@@ -2159,6 +2165,67 @@ async function loadGraph() {
     ctxTargetNode = evt.target;
     ctxEditPerson();
   });
+}
+
+// ══════════════════════════════════════════════════════════
+// CHANGE HISTORY
+// ══════════════════════════════════════════════════════════
+
+let historyOffset = 0;
+const HISTORY_PAGE_SIZE = 50;
+
+function toggleHistoryPanel() {
+  const panel = document.getElementById('historyPanel');
+  const isOpen = panel.classList.toggle('open');
+  if (isOpen) {
+    historyOffset = 0;
+    loadChangelog();
+  }
+}
+
+async function loadChangelog() {
+  if (!currentTreeId) return;
+  try {
+    const res = await fetch(treeApi(`/changelog?limit=${HISTORY_PAGE_SIZE}&offset=${historyOffset}`));
+    if (!res.ok) return;
+    const changes = await res.json();
+    renderChangelog(changes, historyOffset === 0);
+    const loadMoreBtn = document.getElementById('historyLoadMore');
+    if (loadMoreBtn) loadMoreBtn.style.display = changes.length >= HISTORY_PAGE_SIZE ? 'block' : 'none';
+  } catch (e) { /* ignore */ }
+}
+
+function loadMoreHistory() {
+  historyOffset += HISTORY_PAGE_SIZE;
+  loadChangelog();
+}
+
+function renderChangelog(changes, replace) {
+  const listEl = document.getElementById('historyList');
+  if (replace && changes.length === 0) {
+    listEl.innerHTML = '<div class="history-empty">No changes recorded yet</div>';
+    return;
+  }
+  const html = changes.map(c => {
+    const date = new Date(c.created_at).toLocaleString();
+    const badgeClass = 'badge-' + c.action;
+    return `<div class="history-item">
+      <div class="history-action">
+        <span class="history-action-badge ${badgeClass}">${escapeHtml(c.action)}</span>
+        ${escapeHtml(c.entity_type)}
+      </div>
+      <div class="history-details">${escapeHtml(c.details || '')}</div>
+      <div class="history-meta">
+        <span>${escapeHtml(c.user_name || '')}</span>
+        <span>${date}</span>
+      </div>
+    </div>`;
+  }).join('');
+  if (replace) {
+    listEl.innerHTML = html;
+  } else {
+    listEl.insertAdjacentHTML('beforeend', html);
+  }
 }
 
 // ── Initialize ──

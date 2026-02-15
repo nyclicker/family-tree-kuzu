@@ -192,6 +192,7 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             errors.append({"line": line, "type": "rel_error", "message": str(e)})
 
     # Pass 3: Create relationships
+    spouse_pairs = []  # Collect spouse pairs for post-pass merge
     for row in rows:
         p1_display = resolve_name(
             row["raw_p1"], row["raw_p2"] if row["relation"] == "Child" else None
@@ -235,6 +236,7 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             p2 = person_registry.get(p2_display)
             if p1 and p2:
                 add_edge(p1["id"], p2["id"], "SPOUSE_OF", row["line"])
+                spouse_pairs.append((p1["id"], p2["id"], row["line"]))
         elif row["relation"] == "Sibling" and row["raw_p2"]:
             # Sibling = share the same parents. Find p2's parents and add them as parents of p1.
             p2_display, err = resolve_p2_reference(row["raw_p2"], p1_display, row["line"])
@@ -266,6 +268,22 @@ def import_csv_text(conn: kuzu.Connection, text: str, dataset: str = "",
             errors.append({
                 "line": row["line"], "type": "unknown_relation",
                 "message": f'Unknown relation type "{row["relation"]}"',
+            })
+
+    # Post-pass: merge children between spouses (after all edges exist)
+    for p1_id, p2_id, line in spouse_pairs:
+        merge_result = crud.merge_spouse_children(conn, p1_id, p2_id)
+        if merge_result["merged"]:
+            for m in merge_result["merged"]:
+                auto_fixes.append({
+                    "line": line, "type": "spouse_child_merged",
+                    "message": f'Merged duplicate child "{m["name"]}" between spouses',
+                })
+        shared = len(merge_result.get("shared_with_a", [])) + len(merge_result.get("shared_with_b", []))
+        if shared:
+            auto_fixes.append({
+                "line": line, "type": "spouse_children_shared",
+                "message": f'Shared {shared} children between spouses',
             })
 
     total_people = len(crud.list_people(conn, tree_id=tree_id))
@@ -335,6 +353,7 @@ def _import_legacy_db(conn, src, errors, auto_fixes, tree_id=""):
         id_map[row["id"]] = p
 
     rel_count = 0
+    spouse_pairs = []
     rel_rows = cursor.execute(
         "SELECT person1_id, relation, person2_id FROM relationships"
     ).fetchall()
@@ -348,6 +367,7 @@ def _import_legacy_db(conn, src, errors, auto_fixes, tree_id=""):
         elif row["relation"] == "Spouse" and p1 and p2:
             crud.create_relationship(conn, p1["id"], p2["id"], "SPOUSE_OF")
             rel_count += 1
+            spouse_pairs.append((p1["id"], p2["id"]))
         elif row["relation"] == "Earliest Ancestor":
             pass
         elif p1 is None or (p2 is None and row["relation"] != "Earliest Ancestor"):
@@ -355,6 +375,10 @@ def _import_legacy_db(conn, src, errors, auto_fixes, tree_id=""):
                 "line": 0, "type": "missing_person",
                 "message": f'Relationship references missing person ID(s)',
             })
+
+    # Post-pass: merge children between spouses
+    for p1_id, p2_id in spouse_pairs:
+        crud.merge_spouse_children(conn, p1_id, p2_id)
 
     return {
         "people": len(crud.list_people(conn, tree_id=tree_id)), "relationships": rel_count,
@@ -375,6 +399,7 @@ def _import_starter_db(conn, src, errors, auto_fixes, tree_id=""):
         id_map[row["id"]] = p
 
     rel_count = 0
+    spouse_pairs = []
     rel_rows = cursor.execute(
         "SELECT from_person_id, to_person_id, type FROM relationship"
     ).fetchall()
@@ -386,11 +411,17 @@ def _import_starter_db(conn, src, errors, auto_fixes, tree_id=""):
             if rel_type in ("PARENT_OF", "SPOUSE_OF", "SIBLING_OF"):
                 crud.create_relationship(conn, p_from["id"], p_to["id"], rel_type)
                 rel_count += 1
+                if rel_type == "SPOUSE_OF":
+                    spouse_pairs.append((p_from["id"], p_to["id"]))
         else:
             errors.append({
                 "line": 0, "type": "missing_person",
                 "message": "Relationship references missing person ID(s)",
             })
+
+    # Post-pass: merge children between spouses
+    for p1_id, p2_id in spouse_pairs:
+        crud.merge_spouse_children(conn, p1_id, p2_id)
 
     return {
         "people": len(crud.list_people(conn, tree_id=tree_id)), "relationships": rel_count,
