@@ -69,7 +69,7 @@ def _init_schema(db):
     # ── UserGroup table ──
     conn.execute(
         "CREATE NODE TABLE IF NOT EXISTS UserGroup("
-        "id STRING, name STRING, `description` STRING, "
+        "id STRING, name STRING, descr STRING, "
         "created_by STRING, created_at STRING, "
         "PRIMARY KEY(id))"
     )
@@ -130,6 +130,12 @@ def _migrate(db):
         conn.execute("ALTER TABLE User ADD magic_token STRING DEFAULT ''")
     except Exception:
         pass  # column already exists
+
+    # Rename UserGroup.description -> descr (description is a reserved keyword)
+    try:
+        conn.execute("ALTER TABLE UserGroup RENAME description TO descr")
+    except Exception:
+        pass  # already renamed or column doesn't exist
 
 
 def get_conn():
