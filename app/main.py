@@ -27,7 +27,7 @@ def _make_admin_token():
 
 
 # Paths that don't require authentication
-_PUBLIC_PATHS = {"/login", "/health", "/api/auth/register", "/api/auth/login", "/api/auth/logout"}
+_PUBLIC_PATHS = {"/login", "/health", "/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/auth/setup-status"}
 _PUBLIC_PREFIXES = ("/view/",)
 
 
@@ -988,6 +988,12 @@ def export_csv(conn=Depends(get_conn)):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.get("/api/auth/setup-status")
+def setup_status(conn=Depends(get_conn)):
+    """Public endpoint: returns whether initial setup (first user) is needed."""
+    return {"needs_setup": auth.count_users(conn) == 0}
 
 
 @app.get("/api/datasets")

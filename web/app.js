@@ -76,6 +76,31 @@ async function checkAuth() {
 function showLogin() {
   document.getElementById('authScreen').style.display = 'flex';
   document.getElementById('mainApp').style.display = 'none';
+  // Clear all auth form fields for safety
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('regName').value = '';
+  document.getElementById('regEmail').value = '';
+  document.getElementById('regPassword').value = '';
+  document.getElementById('regSetupToken').value = '';
+  document.getElementById('authError').style.display = 'none';
+  // Always reset to login tab
+  showAuthTab('login');
+  // Hide setup token field by default, only show if needed
+  checkSetupStatus();
+}
+
+async function checkSetupStatus() {
+  try {
+    const res = await fetch('/api/auth/setup-status');
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('setupTokenGroup').style.display = data.needs_setup ? 'block' : 'none';
+    }
+  } catch (e) {
+    // Hide by default if we can't check
+    document.getElementById('setupTokenGroup').style.display = 'none';
+  }
 }
 
 function showApp() {
