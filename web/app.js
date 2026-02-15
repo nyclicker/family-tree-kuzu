@@ -2223,6 +2223,53 @@ function loadMoreHistory() {
   loadChangelog();
 }
 
+function formatChangeDetails(details, action, entityType) {
+  if (!details) return '';
+  try {
+    const d = JSON.parse(details);
+    if (entityType === 'relationship') {
+      const relLabel = (d.rel_type || '').replace(/_/g, ' ').toLowerCase();
+      if (action === 'create') {
+        return `Added <strong>${relLabel}</strong>: "${escapeHtml(d.from_name || '?')}" \u2192 "${escapeHtml(d.to_name || '?')}"`;
+      } else if (action === 'delete') {
+        return `Removed <strong>${relLabel}</strong>: "${escapeHtml(d.from_name || '?')}" \u2192 "${escapeHtml(d.to_name || '?')}"`;
+      }
+    }
+    if (entityType === 'person') {
+      if (action === 'create') {
+        let text = `Added "${escapeHtml(d.name || '?')}"`;
+        if (d.sex && d.sex !== 'U') text += ` (${d.sex})`;
+        return text;
+      }
+      if (action === 'delete') {
+        let text = `Deleted "${escapeHtml(d.name || '?')}"`;
+        if (d.sex && d.sex !== 'U') text += ` (${d.sex})`;
+        return text;
+      }
+      if (action === 'update' && d.old && d.new) {
+        const changes = [];
+        if (d.old.name !== d.new.name) changes.push(`name: "${escapeHtml(d.old.name)}" \u2192 "${escapeHtml(d.new.name)}"`);
+        if (d.old.sex !== d.new.sex) changes.push(`sex: ${d.old.sex} \u2192 ${d.new.sex}`);
+        if ((d.old.birth_date || '') !== (d.new.birth_date || '')) changes.push(`birth: ${d.new.birth_date || 'cleared'}`);
+        if ((d.old.death_date || '') !== (d.new.death_date || '')) changes.push(`death: ${d.new.death_date || 'cleared'}`);
+        if (d.old.is_deceased !== d.new.is_deceased) changes.push(d.new.is_deceased ? 'marked deceased' : 'marked living');
+        if ((d.old.notes || '') !== (d.new.notes || '')) changes.push('notes updated');
+        if (changes.length === 0) changes.push('no visible changes');
+        return `Updated "${escapeHtml(d.old.name || d.new.name || '?')}": ${changes.join(', ')}`;
+      }
+      if (action === 'merge') {
+        return `Merged "${escapeHtml(d.removed_name || '?')}" into "${escapeHtml(d.kept_name || '?')}"`;
+      }
+    }
+    if (entityType === 'tree' && action === 'import') {
+      return `Imported "${escapeHtml(d.filename || '?')}": ${d.people} people, ${d.relationships} relationships`;
+    }
+  } catch (e) {
+    // Not JSON — return as escaped plain text (backward compat with old entries)
+  }
+  return escapeHtml(details);
+}
+
 function renderChangelog(changes, replace) {
   const listEl = document.getElementById('historyList');
   if (replace && changes.length === 0) {
@@ -2232,12 +2279,13 @@ function renderChangelog(changes, replace) {
   const html = changes.map(c => {
     const date = new Date(c.created_at).toLocaleString();
     const badgeClass = 'badge-' + c.action;
+    const detailsHtml = formatChangeDetails(c.details, c.action, c.entity_type);
     return `<div class="history-item">
       <div class="history-action">
         <span class="history-action-badge ${badgeClass}">${escapeHtml(c.action)}</span>
         ${escapeHtml(c.entity_type)}
       </div>
-      <div class="history-details">${escapeHtml(c.details || '')}</div>
+      <div class="history-details">${detailsHtml}</div>
       <div class="history-meta">
         <span>${escapeHtml(c.user_name || '')}</span>
         <span>${date}</span>

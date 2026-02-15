@@ -1,5 +1,6 @@
 import re
 import os
+import json
 import hashlib
 import secrets
 from pathlib import Path
@@ -569,7 +570,10 @@ def tree_add_person(tree_id: str, body: schemas.PersonCreate,
                            is_deceased=body.is_deceased)
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
                             "create", "person", p["id"],
-                            f'Added "{body.display_name}"')
+                            json.dumps({"name": body.display_name, "sex": body.sex,
+                                        "notes": body.notes, "birth_date": body.birth_date,
+                                        "death_date": body.death_date,
+                                        "is_deceased": body.is_deceased}))
     return p
 
 
@@ -583,10 +587,17 @@ def tree_update_person(tree_id: str, person_id: str, body: schemas.PersonUpdate,
                            death_date=body.death_date, is_deceased=body.is_deceased)
     if not p:
         raise HTTPException(404, "Person not found")
-    old_name = old["display_name"] if old else "?"
+    old_data = {}
+    if old:
+        old_data = {"name": old["display_name"], "sex": old["sex"],
+                     "notes": old.get("notes"), "birth_date": old.get("birth_date"),
+                     "death_date": old.get("death_date"), "is_deceased": old.get("is_deceased")}
+    new_data = {"name": body.display_name, "sex": body.sex, "notes": body.notes,
+                "birth_date": body.birth_date, "death_date": body.death_date,
+                "is_deceased": body.is_deceased}
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
                             "update", "person", person_id,
-                            f'Updated "{old_name}"')
+                            json.dumps({"old": old_data, "new": new_data}))
     return p
 
 
@@ -595,11 +606,16 @@ def tree_delete_person(tree_id: str, person_id: str,
                        user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
     person = crud.get_person(conn, person_id, tree_id)
-    name = person["display_name"] if person else "?"
+    person_snapshot = {}
+    if person:
+        person_snapshot = {"name": person["display_name"], "sex": person["sex"],
+                           "notes": person.get("notes"), "birth_date": person.get("birth_date"),
+                           "death_date": person.get("death_date"),
+                           "is_deceased": person.get("is_deceased")}
     crud.delete_person(conn, person_id, tree_id=tree_id)
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
                             "delete", "person", person_id,
-                            f'Deleted "{name}"')
+                            json.dumps(person_snapshot))
     return {"ok": True}
 
 
@@ -711,7 +727,10 @@ def tree_merge_person(tree_id: str, person_id: str, body: MergePersonRequest,
     crud.merge_person_into(conn, body.merge_into_id, person_id)
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
                             "merge", "person", body.merge_into_id,
-                            f'Merged "{remove["display_name"]}" into "{keep["display_name"]}"')
+                            json.dumps({"kept_id": body.merge_into_id,
+                                        "kept_name": keep["display_name"],
+                                        "removed_id": person_id,
+                                        "removed_name": remove["display_name"]}))
     return {"ok": True, "kept": keep["display_name"], "removed": remove["display_name"]}
 
 
@@ -746,7 +765,9 @@ def tree_add_rel(tree_id: str, body: schemas.RelCreate,
     p2_name = p2["display_name"] if p2 else "?"
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
                             "create", "relationship", result["id"],
-                            f'{body.type}: "{p1_name}" -> "{p2_name}"')
+                            json.dumps({"rel_type": body.type,
+                                        "from_id": body.from_person_id, "from_name": p1_name,
+                                        "to_id": body.to_person_id, "to_name": p2_name}))
     if body.type == "SPOUSE_OF":
         merged = crud.merge_spouse_children(conn, body.from_person_id, body.to_person_id)
         if merged:
@@ -758,10 +779,16 @@ def tree_add_rel(tree_id: str, body: schemas.RelCreate,
 def tree_delete_rel(tree_id: str, rel_id: str,
                     user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
+    rel_info = crud.get_relationship_detail(conn, rel_id)
     crud.delete_relationship(conn, rel_id)
+    if rel_info:
+        details = json.dumps({"rel_type": rel_info["type"],
+                               "from_id": rel_info["from_id"], "from_name": rel_info["from_name"],
+                               "to_id": rel_info["to_id"], "to_name": rel_info["to_name"]})
+    else:
+        details = json.dumps({"rel_id": rel_id})
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
-                            "delete", "relationship", rel_id,
-                            "Deleted relationship")
+                            "delete", "relationship", rel_id, details)
     return {"ok": True}
 
 
@@ -808,7 +835,8 @@ def tree_import_dataset(tree_id: str, body: DatasetLoadRequest,
     name = ", ".join(dataset_names) if len(dataset_names) > 1 else (dataset_names[0] if dataset_names else "")
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
                             "import", "tree", tree_id,
-                            f'Imported dataset "{name}": {all_people} people, {all_rels} relationships')
+                            json.dumps({"filename": name, "people": all_people,
+                                        "relationships": all_rels}))
     return {
         "people": all_people, "relationships": all_rels,
         "auto_fixes": all_fixes, "errors": all_errors,
@@ -836,7 +864,8 @@ async def tree_import_upload(tree_id: str, file: UploadFile = File(...),
     result["dataset_name"] = Path(name).stem
     changelog.record_change(conn, tree_id, user["id"], user["display_name"],
                             "import", "tree", tree_id,
-                            f'Imported file "{name}": {result["people"]} people, {result["relationships"]} relationships')
+                            json.dumps({"filename": name, "people": result["people"],
+                                        "relationships": result["relationships"]}))
     return result
 
 

@@ -116,6 +116,29 @@ def delete_person(conn: kuzu.Connection, person_id: str, tree_id: str = ""):
     conn.execute("MATCH (p:Person) WHERE p.id = $id DETACH DELETE p", {"id": person_id})
 
 
+def get_relationship_detail(conn: kuzu.Connection, rel_id: str):
+    """Look up a relationship by ID and return type + connected person info."""
+    for rel_type in ["PARENT_OF", "SPOUSE_OF", "SIBLING_OF"]:
+        try:
+            result = conn.execute(
+                f"MATCH (a:Person)-[r:{rel_type}]->(b:Person) WHERE r.id = $id "
+                f"RETURN a.id, a.display_name, b.id, b.display_name",
+                {"id": rel_id}
+            )
+            if result.has_next():
+                row = result.get_next()
+                return {
+                    "type": rel_type,
+                    "from_id": row[0],
+                    "from_name": row[1],
+                    "to_id": row[2],
+                    "to_name": row[3],
+                }
+        except Exception:
+            pass
+    return None
+
+
 def delete_relationship(conn: kuzu.Connection, rel_id: str):
     # Include SIBLING_OF for backward compat cleanup of legacy edges
     for rel_type in ["PARENT_OF", "SPOUSE_OF", "SIBLING_OF"]:
