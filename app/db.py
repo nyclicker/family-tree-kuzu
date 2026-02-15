@@ -69,7 +69,7 @@ def _init_schema(db):
     # ── UserGroup table ──
     conn.execute(
         "CREATE NODE TABLE IF NOT EXISTS UserGroup("
-        "id STRING, name STRING, description STRING, "
+        "id STRING, name STRING, `description` STRING, "
         "created_by STRING, created_at STRING, "
         "PRIMARY KEY(id))"
     )

@@ -9,7 +9,7 @@ def create_group(conn: kuzu.Connection, name: str, description: str,
     gid = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
-        "CREATE (g:UserGroup {id: $id, name: $name, description: $desc, "
+        "CREATE (g:UserGroup {id: $id, name: $name, `description`: $desc, "
         "created_by: $cb, created_at: $ts})",
         {"id": gid, "name": name, "desc": description or "", "cb": created_by, "ts": now}
     )
@@ -20,7 +20,7 @@ def create_group(conn: kuzu.Connection, name: str, description: str,
 def get_group(conn: kuzu.Connection, group_id: str) -> dict | None:
     result = conn.execute(
         "MATCH (g:UserGroup) WHERE g.id = $id "
-        "RETURN g.id, g.name, g.description, g.created_by, g.created_at",
+        "RETURN g.id, g.name, g.`description`, g.created_by, g.created_at",
         {"id": group_id}
     )
     if result.has_next():
@@ -32,7 +32,7 @@ def get_group(conn: kuzu.Connection, group_id: str) -> dict | None:
 
 def update_group(conn: kuzu.Connection, group_id: str, name: str, description: str):
     conn.execute(
-        "MATCH (g:UserGroup) WHERE g.id = $id SET g.name = $name, g.description = $desc",
+        "MATCH (g:UserGroup) WHERE g.id = $id SET g.name = $name, g.`description` = $desc",
         {"id": group_id, "name": name, "desc": description or ""}
     )
 
@@ -52,7 +52,7 @@ def list_user_groups(conn: kuzu.Connection, user_id: str) -> list[dict]:
     # Groups the user created
     result = conn.execute(
         "MATCH (g:UserGroup) WHERE g.created_by = $uid "
-        "RETURN g.id, g.name, g.description, g.created_by, g.created_at",
+        "RETURN g.id, g.name, g.`description`, g.created_by, g.created_at",
         {"uid": user_id}
     )
     while result.has_next():
@@ -63,7 +63,7 @@ def list_user_groups(conn: kuzu.Connection, user_id: str) -> list[dict]:
     # Groups the user is a member of
     result = conn.execute(
         "MATCH (u:User)-[:MEMBER_OF]->(g:UserGroup) WHERE u.id = $uid "
-        "RETURN g.id, g.name, g.description, g.created_by, g.created_at",
+        "RETURN g.id, g.name, g.`description`, g.created_by, g.created_at",
         {"uid": user_id}
     )
     while result.has_next():
@@ -81,7 +81,7 @@ def list_user_groups(conn: kuzu.Connection, user_id: str) -> list[dict]:
 def list_all_groups(conn: kuzu.Connection) -> list[dict]:
     """List all groups (admin view)."""
     result = conn.execute(
-        "MATCH (g:UserGroup) RETURN g.id, g.name, g.description, g.created_by, g.created_at "
+        "MATCH (g:UserGroup) RETURN g.id, g.name, g.`description`, g.created_by, g.created_at "
         "ORDER BY g.name"
     )
     groups = []
