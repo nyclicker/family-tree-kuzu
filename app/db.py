@@ -74,6 +74,15 @@ def _init_schema(db):
         "PRIMARY KEY(id))"
     )
 
+    # ── PersonComment table ──
+    conn.execute(
+        "CREATE NODE TABLE IF NOT EXISTS PersonComment("
+        "id STRING, person_id STRING, tree_id STRING, "
+        "author_id STRING, author_name STRING, content STRING, "
+        "created_at STRING, "
+        "PRIMARY KEY(id))"
+    )
+
     # ── Relationship tables for entitlements ──
     conn.execute(
         "CREATE REL TABLE IF NOT EXISTS OWNS("
@@ -108,6 +117,13 @@ def _migrate(db):
         conn.execute("ALTER TABLE ShareLink ADD tree_id STRING DEFAULT ''")
     except Exception:
         pass  # column already exists
+
+    # Add birth_date, death_date, is_deceased to Person
+    for col, default in [("birth_date", "''"), ("death_date", "''"), ("is_deceased", "false")]:
+        try:
+            conn.execute(f"ALTER TABLE Person ADD {col} {'BOOL' if col == 'is_deceased' else 'STRING'} DEFAULT {default}")
+        except Exception:
+            pass  # column already exists
 
 
 def get_conn():

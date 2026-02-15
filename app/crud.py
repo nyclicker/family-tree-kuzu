@@ -1,5 +1,6 @@
 """CRUD operations using KuzuDB Cypher queries."""
 import uuid
+from datetime import datetime, timezone
 import kuzu
 
 VALID_REL_TYPES = {"PARENT_OF", "SPOUSE_OF"}
@@ -11,31 +12,44 @@ def _person_from_row(row):
         "display_name": row[1],
         "sex": row[2],
         "notes": row[3] if row[3] else None,
+        "birth_date": row[4] if len(row) > 4 and row[4] else None,
+        "death_date": row[5] if len(row) > 5 and row[5] else None,
+        "is_deceased": row[6] if len(row) > 6 else None,
     }
 
 
+_PERSON_RETURN = "p.id, p.display_name, p.sex, p.notes, p.birth_date, p.death_date, p.is_deceased"
+
+
 def create_person(conn: kuzu.Connection, display_name: str, sex: str = "U",
-                  notes: str | None = None, dataset: str = "", tree_id: str = ""):
+                  notes: str | None = None, dataset: str = "", tree_id: str = "",
+                  birth_date: str | None = None, death_date: str | None = None,
+                  is_deceased: bool | None = None):
     pid = str(uuid.uuid4())
+    # Auto-set is_deceased if death_date provided
+    if death_date and is_deceased is None:
+        is_deceased = True
     conn.execute(
         "CREATE (p:Person {id: $id, display_name: $name, sex: $sex, notes: $notes, "
-        "dataset: $ds, tree_id: $tid})",
+        "dataset: $ds, tree_id: $tid, birth_date: $bd, death_date: $dd, is_deceased: $dec})",
         {"id": pid, "name": display_name, "sex": sex, "notes": notes or "",
-         "ds": dataset or "", "tid": tree_id or ""}
+         "ds": dataset or "", "tid": tree_id or "",
+         "bd": birth_date or "", "dd": death_date or "", "dec": bool(is_deceased)}
     )
-    return {"id": pid, "display_name": display_name, "sex": sex, "notes": notes}
+    return {"id": pid, "display_name": display_name, "sex": sex, "notes": notes,
+            "birth_date": birth_date, "death_date": death_date, "is_deceased": is_deceased or False}
 
 
 def list_people(conn: kuzu.Connection, tree_id: str = ""):
     if tree_id:
         result = conn.execute(
-            "MATCH (p:Person) WHERE p.tree_id = $tid "
-            "RETURN p.id, p.display_name, p.sex, p.notes ORDER BY p.display_name",
+            f"MATCH (p:Person) WHERE p.tree_id = $tid "
+            f"RETURN {_PERSON_RETURN} ORDER BY p.display_name",
             {"tid": tree_id}
         )
     else:
         result = conn.execute(
-            "MATCH (p:Person) RETURN p.id, p.display_name, p.sex, p.notes ORDER BY p.display_name"
+            f"MATCH (p:Person) RETURN {_PERSON_RETURN} ORDER BY p.display_name"
         )
     people = []
     while result.has_next():
@@ -46,13 +60,13 @@ def list_people(conn: kuzu.Connection, tree_id: str = ""):
 def get_person(conn: kuzu.Connection, person_id: str, tree_id: str = ""):
     if tree_id:
         result = conn.execute(
-            "MATCH (p:Person) WHERE p.id = $id AND p.tree_id = $tid "
-            "RETURN p.id, p.display_name, p.sex, p.notes",
+            f"MATCH (p:Person) WHERE p.id = $id AND p.tree_id = $tid "
+            f"RETURN {_PERSON_RETURN}",
             {"id": person_id, "tid": tree_id}
         )
     else:
         result = conn.execute(
-            "MATCH (p:Person) WHERE p.id = $id RETURN p.id, p.display_name, p.sex, p.notes",
+            f"MATCH (p:Person) WHERE p.id = $id RETURN {_PERSON_RETURN}",
             {"id": person_id}
         )
     if result.has_next():
@@ -73,15 +87,23 @@ def create_relationship(conn: kuzu.Connection, from_id: str, to_id: str, rel_typ
 
 
 def update_person(conn: kuzu.Connection, person_id: str, display_name: str,
-                  sex: str, notes: str | None = None, tree_id: str = ""):
+                  sex: str, notes: str | None = None, tree_id: str = "",
+                  birth_date: str | None = None, death_date: str | None = None,
+                  is_deceased: bool | None = None):
     if not get_person(conn, person_id, tree_id):
         return None
+    # Auto-set is_deceased if death_date provided
+    if death_date and is_deceased is None:
+        is_deceased = True
     conn.execute(
         "MATCH (p:Person) WHERE p.id = $id "
-        "SET p.display_name = $name, p.sex = $sex, p.notes = $notes",
-        {"id": person_id, "name": display_name, "sex": sex, "notes": notes or ""}
+        "SET p.display_name = $name, p.sex = $sex, p.notes = $notes, "
+        "p.birth_date = $bd, p.death_date = $dd, p.is_deceased = $dec",
+        {"id": person_id, "name": display_name, "sex": sex, "notes": notes or "",
+         "bd": birth_date or "", "dd": death_date or "", "dec": bool(is_deceased)}
     )
-    return {"id": person_id, "display_name": display_name, "sex": sex, "notes": notes}
+    return {"id": person_id, "display_name": display_name, "sex": sex, "notes": notes,
+            "birth_date": birth_date, "death_date": death_date, "is_deceased": is_deceased or False}
 
 
 def delete_person(conn: kuzu.Connection, person_id: str, tree_id: str = ""):
@@ -89,6 +111,8 @@ def delete_person(conn: kuzu.Connection, person_id: str, tree_id: str = ""):
         # Verify person belongs to tree before deleting
         if not get_person(conn, person_id, tree_id):
             return
+    # Cascade-delete comments for this person
+    conn.execute("MATCH (c:PersonComment) WHERE c.person_id = $pid DELETE c", {"pid": person_id})
     conn.execute("MATCH (p:Person) WHERE p.id = $id DETACH DELETE p", {"id": person_id})
 
 
@@ -106,13 +130,13 @@ def delete_relationship(conn: kuzu.Connection, rel_id: str):
 def find_person_by_name(conn: kuzu.Connection, display_name: str, tree_id: str = ""):
     if tree_id:
         result = conn.execute(
-            "MATCH (p:Person) WHERE p.display_name = $name AND p.tree_id = $tid "
-            "RETURN p.id, p.display_name, p.sex, p.notes",
+            f"MATCH (p:Person) WHERE p.display_name = $name AND p.tree_id = $tid "
+            f"RETURN {_PERSON_RETURN}",
             {"name": display_name, "tid": tree_id}
         )
     else:
         result = conn.execute(
-            "MATCH (p:Person) WHERE p.display_name = $name RETURN p.id, p.display_name, p.sex, p.notes",
+            f"MATCH (p:Person) WHERE p.display_name = $name RETURN {_PERSON_RETURN}",
             {"name": display_name}
         )
     if result.has_next():
@@ -123,8 +147,8 @@ def find_person_by_name(conn: kuzu.Connection, display_name: str, tree_id: str =
 def get_children(conn: kuzu.Connection, person_id: str):
     """Get all children of a person (via outgoing PARENT_OF edges)."""
     result = conn.execute(
-        "MATCH (p:Person)-[:PARENT_OF]->(c:Person) WHERE p.id = $id "
-        "RETURN c.id, c.display_name, c.sex, c.notes",
+        f"MATCH (p:Person)-[:PARENT_OF]->(c:Person) WHERE p.id = $id "
+        f"RETURN {_PERSON_RETURN.replace('p.', 'c.')}",
         {"id": person_id}
     )
     children = []
@@ -137,7 +161,8 @@ def get_parents(conn: kuzu.Connection, person_id: str):
     """Get all parents of a person (incoming PARENT_OF edges)."""
     result = conn.execute(
         "MATCH (parent:Person)-[:PARENT_OF]->(child:Person) WHERE child.id = $id "
-        "RETURN parent.id, parent.display_name, parent.sex, parent.notes",
+        "RETURN parent.id, parent.display_name, parent.sex, parent.notes, "
+        "parent.birth_date, parent.death_date, parent.is_deceased",
         {"id": person_id}
     )
     parents = []
@@ -302,6 +327,63 @@ def count_spouses(conn: kuzu.Connection, person_id: str) -> int:
 
 def clear_all(conn: kuzu.Connection, tree_id: str = ""):
     if tree_id:
+        conn.execute("MATCH (c:PersonComment) WHERE c.tree_id = $tid DELETE c", {"tid": tree_id})
         conn.execute("MATCH (p:Person) WHERE p.tree_id = $tid DETACH DELETE p", {"tid": tree_id})
     else:
+        conn.execute("MATCH (c:PersonComment) DELETE c")
         conn.execute("MATCH (p:Person) DETACH DELETE p")
+
+
+# ── Comment CRUD ──
+
+def _comment_from_row(row):
+    return {
+        "id": row[0],
+        "person_id": row[1],
+        "author_id": row[2],
+        "author_name": row[3],
+        "content": row[4],
+        "created_at": row[5],
+    }
+
+
+def create_comment(conn: kuzu.Connection, person_id: str, tree_id: str,
+                   author_id: str, author_name: str, content: str):
+    cid = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "CREATE (c:PersonComment {id: $id, person_id: $pid, tree_id: $tid, "
+        "author_id: $aid, author_name: $aname, content: $content, created_at: $ts})",
+        {"id": cid, "pid": person_id, "tid": tree_id,
+         "aid": author_id, "aname": author_name, "content": content, "ts": now}
+    )
+    return {"id": cid, "person_id": person_id, "author_id": author_id,
+            "author_name": author_name, "content": content, "created_at": now}
+
+
+def list_comments(conn: kuzu.Connection, person_id: str, tree_id: str):
+    result = conn.execute(
+        "MATCH (c:PersonComment) WHERE c.person_id = $pid AND c.tree_id = $tid "
+        "RETURN c.id, c.person_id, c.author_id, c.author_name, c.content, c.created_at "
+        "ORDER BY c.created_at",
+        {"pid": person_id, "tid": tree_id}
+    )
+    comments = []
+    while result.has_next():
+        comments.append(_comment_from_row(result.get_next()))
+    return comments
+
+
+def get_comment(conn: kuzu.Connection, comment_id: str):
+    result = conn.execute(
+        "MATCH (c:PersonComment) WHERE c.id = $id "
+        "RETURN c.id, c.person_id, c.author_id, c.author_name, c.content, c.created_at",
+        {"id": comment_id}
+    )
+    if result.has_next():
+        return _comment_from_row(result.get_next())
+    return None
+
+
+def delete_comment(conn: kuzu.Connection, comment_id: str):
+    conn.execute("MATCH (c:PersonComment) WHERE c.id = $id DELETE c", {"id": comment_id})

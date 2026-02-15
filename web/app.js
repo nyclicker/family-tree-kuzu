@@ -23,6 +23,9 @@ let ctxTargetEdge = null;
 // Track whether user has dragged nodes
 let layoutDirty = false;
 
+// Track comment IDs created in this session (for delete eligibility)
+const sessionCommentIds = new Set();
+
 // Track cursor position on the graph canvas for placing new nodes
 let lastCtxPosition = null;
 
@@ -396,22 +399,34 @@ function showStatus(id, message, isError) {
 
 // ── Sidebar: Add Person ──
 
+function onSidebarDeathDateChange() {
+  if (document.getElementById('personDeathDate').value) {
+    document.getElementById('personDeceased').checked = true;
+  }
+}
+
 async function addPerson() {
   if (!currentTreeId || !canEdit()) return;
   const name = document.getElementById('personName').value.trim();
   if (!name) { showStatus('personStatus', 'Name is required', true); return; }
   const sex = document.getElementById('personSex').value;
   const notes = document.getElementById('personNotes').value.trim() || null;
+  const birth_date = document.getElementById('personBirthDate').value || null;
+  const death_date = document.getElementById('personDeathDate').value || null;
+  const is_deceased = document.getElementById('personDeceased').checked || null;
   try {
     const res = await fetch(treeApi('/people'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ display_name: name, sex, notes })
+      body: JSON.stringify({ display_name: name, sex, notes, birth_date, death_date, is_deceased })
     });
     if (!res.ok) throw new Error(await res.text());
     const newPerson = await res.json();
     document.getElementById('personName').value = '';
     document.getElementById('personNotes').value = '';
+    document.getElementById('personBirthDate').value = '';
+    document.getElementById('personDeathDate').value = '';
+    document.getElementById('personDeceased').checked = false;
     showStatus('personStatus', `Added ${name}`, false);
     await refresh();
     highlightNewNode(newPerson.id);
@@ -1088,8 +1103,19 @@ function ctxEditPerson() {
   document.getElementById('editPersonName').value = person.display_name;
   document.getElementById('editPersonSex').value = person.sex;
   document.getElementById('editPersonNotes').value = person.notes || '';
+  document.getElementById('editBirthDate').value = person.birth_date || '';
+  document.getElementById('editDeathDate').value = person.death_date || '';
+  document.getElementById('editDeceased').checked = !!person.is_deceased;
   document.getElementById('editModalTitle').textContent = 'Edit Person';
+  document.getElementById('editCommentInput').value = '';
+  loadComments(id);
   openModal('editPersonModal');
+}
+
+function onEditDeathDateChange() {
+  if (document.getElementById('editDeathDate').value) {
+    document.getElementById('editDeceased').checked = true;
+  }
 }
 
 async function saveEditPerson() {
@@ -1098,16 +1124,90 @@ async function saveEditPerson() {
   const display_name = document.getElementById('editPersonName').value.trim();
   const sex = document.getElementById('editPersonSex').value;
   const notes = document.getElementById('editPersonNotes').value.trim() || null;
+  const birth_date = document.getElementById('editBirthDate').value || null;
+  const death_date = document.getElementById('editDeathDate').value || null;
+  const is_deceased = document.getElementById('editDeceased').checked || null;
   if (!display_name) return;
   try {
     const res = await fetch(treeApi(`/people/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ display_name, sex, notes })
+      body: JSON.stringify({ display_name, sex, notes, birth_date, death_date, is_deceased })
     });
     if (!res.ok) throw new Error(await res.text());
     closeModal('editPersonModal');
     await refresh();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// ── Comments ──
+
+async function loadComments(personId) {
+  const listEl = document.getElementById('editCommentList');
+  if (!currentTreeId) { listEl.innerHTML = ''; return; }
+  try {
+    const res = await fetch(treeApi(`/people/${personId}/comments`));
+    if (!res.ok) throw new Error('Failed to load comments');
+    const comments = await res.json();
+    renderComments(comments, personId);
+  } catch (e) {
+    listEl.innerHTML = '<div style="color:#e74c3c;font-size:12px">Error loading comments</div>';
+  }
+}
+
+function renderComments(comments, personId) {
+  const listEl = document.getElementById('editCommentList');
+  if (comments.length === 0) {
+    listEl.innerHTML = '<div style="color:#999;font-size:12px">No comments yet</div>';
+    return;
+  }
+  listEl.innerHTML = comments.map(c => {
+    const date = new Date(c.created_at).toLocaleString();
+    const canDel = sessionCommentIds.has(c.id);
+    const delBtn = canDel
+      ? `<button class="comment-delete" onclick="deleteComment('${personId}','${c.id}')" title="Delete">&#10005;</button>`
+      : '';
+    return `<div class="comment-item">
+      <div class="comment-meta">
+        <span><span class="comment-author">${escapeHtml(c.author_name)}</span> &mdash; ${date}</span>
+        ${delBtn}
+      </div>
+      <div class="comment-content">${escapeHtml(c.content)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function addComment() {
+  if (!currentTreeId || !canEdit()) return;
+  const personId = document.getElementById('editPersonId').value;
+  const input = document.getElementById('editCommentInput');
+  const content = input.value.trim();
+  if (!content) return;
+  try {
+    const res = await fetch(treeApi(`/people/${personId}/comments`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const comment = await res.json();
+    sessionCommentIds.add(comment.id);
+    input.value = '';
+    await loadComments(personId);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deleteComment(personId, commentId) {
+  if (!confirm('Delete this comment?')) return;
+  try {
+    const res = await fetch(treeApi(`/people/${personId}/comments/${commentId}`), { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    sessionCommentIds.delete(commentId);
+    await loadComments(personId);
   } catch (e) {
     alert('Error: ' + e.message);
   }
@@ -1486,6 +1586,49 @@ async function saveModalPerson() {
   }
 }
 
+// ── Context Menu: Find Person ──
+
+function ctxFindPerson() {
+  hideAllMenus();
+  document.getElementById('findPersonInput').value = '';
+  document.getElementById('findPersonResults').innerHTML = '';
+  openModal('findPersonModal');
+  setTimeout(() => document.getElementById('findPersonInput').focus(), 50);
+}
+
+function onFindPersonInput() {
+  const query = document.getElementById('findPersonInput').value.trim().toLowerCase();
+  const listEl = document.getElementById('findPersonResults');
+  if (!query) { listEl.innerHTML = ''; return; }
+  const filtered = people.filter(p => p.display_name.toLowerCase().includes(query));
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<li style="color:#999">No matches</li>';
+    return;
+  }
+  const re = new RegExp(`(${escapeRegex(query)})`, 'gi');
+  listEl.innerHTML = filtered.map(p => {
+    const name = escapeHtml(p.display_name).replace(re, '<span class="match-highlight">$1</span>');
+    return `<li data-id="${p.id}" onclick="findPersonSelect('${p.id}')"><span class="sex-badge">${p.sex}</span> ${name}</li>`;
+  }).join('');
+}
+
+function onFindPersonKeydown(e) {
+  if (e.key === 'Enter') {
+    const query = document.getElementById('findPersonInput').value.trim().toLowerCase();
+    if (!query) return;
+    const match = people.find(p => p.display_name.toLowerCase().includes(query));
+    if (match) findPersonSelect(match.id);
+  }
+  if (e.key === 'Escape') {
+    closeModal('findPersonModal');
+  }
+}
+
+function findPersonSelect(personId) {
+  closeModal('findPersonModal');
+  navigateToPerson(personId);
+}
+
 // ══════════════════════════════════════════════════════════
 // SHARING (tree-scoped)
 // ══════════════════════════════════════════════════════════
@@ -1821,7 +1964,11 @@ async function loadGraph() {
   data.nodes.forEach(n => {
     const gen = generations[n.data.id] || 0;
     const color = GEN_COLORS[gen % GEN_COLORS.length];
-    elements.push({ data: { id: n.data.id, label: n.data.label, gen, color } });
+    const nodeData = { id: n.data.id, label: n.data.label, gen, color };
+    if (n.data.is_deceased) nodeData.is_deceased = true;
+    if (n.data.birth_date) nodeData.birth_date = n.data.birth_date;
+    if (n.data.death_date) nodeData.death_date = n.data.death_date;
+    elements.push({ data: nodeData });
   });
 
   const spouseOf = {};
@@ -1918,6 +2065,15 @@ async function loadGraph() {
         }
       },
       {
+        selector: 'node[?is_deceased]',
+        style: {
+          'border-style': 'dashed',
+          'border-width': 4,
+          'border-color': '#95a5a6',
+          'opacity': 0.75
+        }
+      },
+      {
         selector: 'node.search-dimmed',
         style: { 'opacity': 0.15 }
       },
@@ -2005,11 +2161,15 @@ async function loadGraph() {
 
   cy.on('cxttap', function(evt) {
     if (evt.target === cy) {
-      if (!canEdit()) return;
       evt.originalEvent.preventDefault();
       ctxTargetNode = null;
       ctxTargetEdge = null;
       lastCtxPosition = evt.position;
+      // Hide "Add Person" for viewers, but always show "Find Person"
+      const addItem = document.querySelector('#ctxBg .ctx-item[onclick="ctxAddPersonHere()"]');
+      const addSep = addItem ? addItem.previousElementSibling : null;
+      if (addItem) addItem.style.display = canEdit() ? '' : 'none';
+      if (addSep) addSep.style.display = canEdit() ? '' : 'none';
       showMenu('ctxBg', evt.originalEvent.clientX, evt.originalEvent.clientY);
     }
   });

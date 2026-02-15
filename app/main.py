@@ -415,7 +415,9 @@ def tree_people(tree_id: str, user=Depends(auth.get_current_user),
 def tree_add_person(tree_id: str, body: schemas.PersonCreate,
                     user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
-    return crud.create_person(conn, body.display_name, body.sex, body.notes, tree_id=tree_id)
+    return crud.create_person(conn, body.display_name, body.sex, body.notes, tree_id=tree_id,
+                              birth_date=body.birth_date, death_date=body.death_date,
+                              is_deceased=body.is_deceased)
 
 
 @app.put("/api/trees/{tree_id}/people/{person_id}", response_model=schemas.PersonOut)
@@ -423,7 +425,8 @@ def tree_update_person(tree_id: str, person_id: str, body: schemas.PersonUpdate,
                        user=Depends(auth.get_current_user), conn=Depends(get_conn)):
     trees.require_role(conn, user["id"], tree_id, "editor")
     p = crud.update_person(conn, person_id, body.display_name, body.sex, body.notes,
-                           tree_id=tree_id)
+                           tree_id=tree_id, birth_date=body.birth_date,
+                           death_date=body.death_date, is_deceased=body.is_deceased)
     if not p:
         raise HTTPException(404, "Person not found")
     return p
@@ -486,6 +489,41 @@ def tree_relationship_counts(tree_id: str, person_id: str,
         "parents": crud.count_parents(conn, person_id),
         "spouses": crud.count_spouses(conn, person_id),
     }
+
+
+# ── Comment endpoints ──
+
+@app.get("/api/trees/{tree_id}/people/{person_id}/comments",
+         response_model=list[schemas.CommentOut])
+def tree_list_comments(tree_id: str, person_id: str,
+                       user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    trees.require_role(conn, user["id"], tree_id, "viewer")
+    return crud.list_comments(conn, person_id, tree_id)
+
+
+@app.post("/api/trees/{tree_id}/people/{person_id}/comments",
+          response_model=schemas.CommentOut)
+def tree_add_comment(tree_id: str, person_id: str, body: schemas.CommentCreate,
+                     user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    trees.require_role(conn, user["id"], tree_id, "editor")
+    person = crud.get_person(conn, person_id, tree_id)
+    if not person:
+        raise HTTPException(404, "Person not found")
+    return crud.create_comment(conn, person_id, tree_id,
+                               user["id"], user["display_name"], body.content)
+
+
+@app.delete("/api/trees/{tree_id}/people/{person_id}/comments/{comment_id}")
+def tree_delete_comment(tree_id: str, person_id: str, comment_id: str,
+                        user=Depends(auth.get_current_user), conn=Depends(get_conn)):
+    trees.require_role(conn, user["id"], tree_id, "editor")
+    comment = crud.get_comment(conn, comment_id)
+    if not comment:
+        raise HTTPException(404, "Comment not found")
+    if comment["author_id"] != user["id"]:
+        raise HTTPException(403, "You can only delete your own comments")
+    crud.delete_comment(conn, comment_id)
+    return {"ok": True}
 
 
 @app.post("/api/trees/{tree_id}/relationships")

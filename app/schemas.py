@@ -7,12 +7,18 @@ class PersonCreate(BaseModel):
     display_name: str
     sex: Literal["M","F","U"] = "U"
     notes: Optional[str] = None
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    is_deceased: Optional[bool] = None
 
 class PersonOut(BaseModel):
     id: str
     display_name: str
     sex: str
     notes: Optional[str] = None
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    is_deceased: Optional[bool] = None
 
 class RelCreate(BaseModel):
     from_person_id: str
@@ -23,6 +29,22 @@ class PersonUpdate(BaseModel):
     display_name: str
     sex: Literal["M","F","U"] = "U"
     notes: Optional[str] = None
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    is_deceased: Optional[bool] = None
+
+# ── Comments ──
+
+class CommentCreate(BaseModel):
+    content: str
+
+class CommentOut(BaseModel):
+    id: str
+    person_id: str
+    author_id: str
+    author_name: str
+    content: str
+    created_at: str
 
 class GraphOut(BaseModel):
     nodes: list[dict]

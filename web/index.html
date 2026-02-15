@@ -199,6 +199,38 @@
     .member-item .member-role { font-size: 11px; color: #999; }
     .member-item .member-actions { display: flex; gap: 4px; align-items: center; }
     .member-item .member-actions select { font-size: 11px; padding: 2px 4px; }
+
+    /* Comments */
+    .comments-section { margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
+    .comments-section h4 { font-size: 13px; color: #2c3e50; margin-bottom: 8px; }
+    .comment-list { max-height: 200px; overflow-y: auto; margin-bottom: 8px; }
+    .comment-item {
+      padding: 8px; margin-bottom: 6px; background: #f9f9f9; border-radius: 4px;
+      font-size: 12px; position: relative;
+    }
+    .comment-item .comment-meta {
+      font-size: 11px; color: #999; margin-bottom: 3px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .comment-item .comment-meta .comment-author { font-weight: 600; color: #555; }
+    .comment-item .comment-content { color: #333; white-space: pre-wrap; word-break: break-word; }
+    .comment-item .comment-delete {
+      color: #e74c3c; cursor: pointer; font-size: 11px; font-weight: bold;
+      background: none; border: none; padding: 0 4px;
+    }
+    .comment-item .comment-delete:hover { text-decoration: underline; }
+    .comment-add { display: flex; gap: 4px; }
+    .comment-add textarea {
+      flex: 1; padding: 6px 8px; font-size: 12px; border: 1px solid #ccc;
+      border-radius: 4px; resize: vertical; height: 40px; font-family: inherit;
+    }
+
+    /* Date inputs */
+    .date-row { display: flex; gap: 8px; }
+    .date-row .form-group { flex: 1; }
+    .deceased-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+    .deceased-row input[type="checkbox"] { margin: 0; }
+    .deceased-row label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; margin: 0; }
   </style>
 </head>
 <body>
@@ -253,7 +285,7 @@
       <div class="header-actions">
         <div class="legend">
           <span style="font-size:11px; color:#aaa">
-            Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed = Spouse
+            Colors = Generations &nbsp; | &nbsp; Solid = Parent-Child &nbsp; Dashed line = Spouse &nbsp; Dashed border = Deceased
           </span>
         </div>
         <button class="btn-header" id="exportPngBtn" onclick="exportGraphPng()" style="display:none" title="Download graph as PNG image">Export PNG</button>
@@ -352,6 +384,20 @@
               <option value="U">Unknown</option>
             </select>
           </div>
+          <div class="date-row">
+            <div class="form-group">
+              <label>Birth Date</label>
+              <input type="date" id="personBirthDate">
+            </div>
+            <div class="form-group">
+              <label>Death Date</label>
+              <input type="date" id="personDeathDate" onchange="onSidebarDeathDateChange()">
+            </div>
+          </div>
+          <div class="deceased-row">
+            <input type="checkbox" id="personDeceased">
+            <label for="personDeceased">Deceased</label>
+          </div>
           <div class="form-group">
             <label>Notes</label>
             <textarea id="personNotes" placeholder="Optional notes..."></textarea>
@@ -442,12 +488,28 @@
     <div class="ctx-item danger" onclick="ctxDeleteRelationship()"><span class="ctx-icon">&#10005;</span> Delete Relationship</div>
   </div>
   <div id="ctxBg" class="ctx-menu">
+    <div class="ctx-item" onclick="ctxFindPerson()"><span class="ctx-icon">&#x1F50D;</span> Find Person</div>
+    <div class="ctx-sep"></div>
     <div class="ctx-item" onclick="ctxAddPersonHere()"><span class="ctx-icon">&#43;</span> Add Person</div>
+  </div>
+
+  <!-- Find Person Modal -->
+  <div id="findPersonModal" class="modal-overlay">
+    <div class="modal">
+      <h3>Find Person</h3>
+      <div class="form-group">
+        <input type="text" id="findPersonInput" placeholder="Type a name to search..." oninput="onFindPersonInput()" onkeydown="onFindPersonKeydown(event)">
+      </div>
+      <ul id="findPersonResults" class="person-list" style="max-height:260px"></ul>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal('findPersonModal')">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- Edit Person Modal -->
   <div id="editPersonModal" class="modal-overlay">
-    <div class="modal">
+    <div class="modal" style="width:440px">
       <h3 id="editModalTitle">Edit Person</h3>
       <input type="hidden" id="editPersonId">
       <div class="form-group">
@@ -462,13 +524,38 @@
           <option value="U">Unknown</option>
         </select>
       </div>
+      <div class="date-row">
+        <div class="form-group">
+          <label>Birth Date</label>
+          <input type="date" id="editBirthDate">
+        </div>
+        <div class="form-group">
+          <label>Death Date</label>
+          <input type="date" id="editDeathDate" onchange="onEditDeathDateChange()">
+        </div>
+      </div>
+      <div class="deceased-row">
+        <input type="checkbox" id="editDeceased">
+        <label for="editDeceased">Deceased</label>
+      </div>
       <div class="form-group">
-        <label>Notes</label>
+        <label>Notes / Bio</label>
         <textarea id="editPersonNotes" placeholder="Optional notes..."></textarea>
       </div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeModal('editPersonModal')">Cancel</button>
         <button class="btn-primary" onclick="saveEditPerson()">Save</button>
+      </div>
+      <!-- Comments Section -->
+      <div class="comments-section">
+        <h4>Stories &amp; Comments</h4>
+        <div id="editCommentList" class="comment-list">
+          <div style="color:#999;font-size:12px">No comments yet</div>
+        </div>
+        <div class="comment-add">
+          <textarea id="editCommentInput" placeholder="Add a comment or story..."></textarea>
+          <button class="btn-success" onclick="addComment()" style="padding:6px 12px;align-self:flex-end">Post</button>
+        </div>
       </div>
     </div>
   </div>
@@ -665,6 +752,6 @@
     </div>
   </div>
 
-  <script src="/web/app.js?v=5"></script>
+  <script src="/web/app.js?v=6"></script>
 </body>
 </html>

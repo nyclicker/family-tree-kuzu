@@ -42,7 +42,12 @@ def rename_tree(conn: kuzu.Connection, tree_id: str, name: str):
 
 
 def delete_tree(conn: kuzu.Connection, tree_id: str):
-    """Delete a tree, all its people, share links, and access relationships."""
+    """Delete a tree, all its people, comments, share links, and access relationships."""
+    # Delete all comments in this tree
+    conn.execute(
+        "MATCH (c:PersonComment) WHERE c.tree_id = $tid DELETE c",
+        {"tid": tree_id}
+    )
     # Delete all people in this tree
     conn.execute(
         "MATCH (p:Person) WHERE p.tree_id = $tid DETACH DELETE p",
