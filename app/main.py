@@ -138,8 +138,44 @@ def _run_migration(conn):
             )
 
 
+def _log_disk_diagnostics():
+    """Log disk mount and DB path info on startup for debugging persistence issues."""
+    import logging
+    log = logging.getLogger("app.startup")
+    from .db import DB_PATH
+    db_parent = DB_PATH.parent
+    log.warning("=== DISK DIAGNOSTICS ===")
+    log.warning("DB_PATH = %s", DB_PATH)
+    log.warning("DB_PATH.parent = %s", db_parent)
+    log.warning("DB_PATH exists = %s", DB_PATH.exists())
+    log.warning("DB_PATH.parent exists = %s", db_parent.exists())
+    # Check if /data exists and what's in it (Render persistent disk mount point)
+    data_dir = Path("/data")
+    log.warning("/data exists = %s", data_dir.exists())
+    if data_dir.exists():
+        try:
+            contents = list(data_dir.iterdir())
+            log.warning("/data contents = %s", [str(c) for c in contents])
+        except Exception as e:
+            log.warning("/data listing error: %s", e)
+    # Check /proc/mounts for /data mount (Linux only)
+    proc_mounts = Path("/proc/mounts")
+    if proc_mounts.exists():
+        try:
+            mounts = proc_mounts.read_text()
+            data_mounts = [l for l in mounts.splitlines() if "/data" in l]
+            if data_mounts:
+                log.warning("/data mount info: %s", data_mounts)
+            else:
+                log.warning("WARNING: /data is NOT in /proc/mounts — disk may not be mounted!")
+        except Exception as e:
+            log.warning("Could not read /proc/mounts: %s", e)
+    log.warning("=== END DIAGNOSTICS ===")
+
+
 @asynccontextmanager
 async def lifespan(app):
+    _log_disk_diagnostics()
     db = get_database()
     import kuzu
     conn = kuzu.Connection(db)
@@ -1245,8 +1281,31 @@ def export_csv(conn=Depends(get_conn)):
 # ═══════════════════════════════════════════════════════════════
 
 @app.get("/health")
-def health():
-    return {"ok": True}
+def health(conn=Depends(get_conn)):
+    from .db import DB_PATH
+    user_count = auth.count_users(conn)
+    data_dir = Path("/data")
+    diag = {
+        "ok": True,
+        "db_path": str(DB_PATH),
+        "db_exists": DB_PATH.exists(),
+        "data_dir_exists": data_dir.exists(),
+        "user_count": user_count,
+    }
+    if data_dir.exists():
+        try:
+            diag["data_contents"] = [str(c.name) for c in data_dir.iterdir()]
+        except Exception:
+            diag["data_contents"] = "error"
+    # Check mount
+    proc_mounts = Path("/proc/mounts")
+    if proc_mounts.exists():
+        try:
+            mounts = proc_mounts.read_text()
+            diag["data_mounted"] = any("/data" in l for l in mounts.splitlines())
+        except Exception:
+            diag["data_mounted"] = "unknown"
+    return diag
 
 
 @app.get("/api/auth/setup-status")
