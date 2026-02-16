@@ -285,6 +285,12 @@ def merge_person_into(conn: kuzu.Connection, keep_id: str, remove_id: str):
             if source_id != keep_id and not _edge_exists(conn, source_id, keep_id, rel_type):
                 create_relationship(conn, source_id, keep_id, rel_type)
 
+    # Transfer comments from remove to keep
+    conn.execute(
+        "MATCH (c:PersonComment) WHERE c.person_id = $rid SET c.person_id = $kid",
+        {"rid": remove_id, "kid": keep_id}
+    )
+
     # Delete the merged person and all its edges
     delete_person(conn, remove_id)
 

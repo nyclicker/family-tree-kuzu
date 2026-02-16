@@ -695,11 +695,12 @@ def tree_add_comment(tree_id: str, person_id: str, body: schemas.CommentCreate,
 @app.delete("/api/trees/{tree_id}/people/{person_id}/comments/{comment_id}")
 def tree_delete_comment(tree_id: str, person_id: str, comment_id: str,
                         user=Depends(auth.get_current_user), conn=Depends(get_conn)):
-    trees.require_role(conn, user["id"], tree_id, "editor")
+    role = trees.require_role(conn, user["id"], tree_id, "editor")
     comment = crud.get_comment(conn, comment_id)
     if not comment:
         raise HTTPException(404, "Comment not found")
-    if comment["author_id"] != user["id"]:
+    # Owners and editors can delete any comment; viewers cannot reach here (require_role above)
+    if comment["author_id"] != user["id"] and role not in ("owner", "editor"):
         raise HTTPException(403, "You can only delete your own comments")
     crud.delete_comment(conn, comment_id)
     return {"ok": True}
@@ -749,8 +750,8 @@ def tree_add_rel(tree_id: str, body: schemas.RelCreate,
     trees.require_role(conn, user["id"], tree_id, "editor")
     if body.type == "PARENT_OF":
         child_parents = crud.count_parents(conn, body.to_person_id)
-        if child_parents >= 1:
-            raise HTTPException(400, "This person already has a parent. Use 'Replace Parent' to change it.")
+        if child_parents >= 2:
+            raise HTTPException(400, "This person already has two parents. Use 'Replace Parent' to change them.")
     if body.type == "SPOUSE_OF":
         from_spouses = crud.count_spouses(conn, body.from_person_id)
         to_spouses = crud.count_spouses(conn, body.to_person_id)
@@ -900,12 +901,19 @@ def tree_export_csv(tree_id: str, user=Depends(auth.get_current_user),
     children_ids = {e["to_id"] for e in edges if e["type"] == "PARENT_OF"}
     buf = io_mod.StringIO()
     writer = csv_mod.writer(buf)
-    writer.writerow(["Person 1", "Relation", "Person 2", "Gender", "Details"])
+    writer.writerow(["Person 1", "Relation", "Person 2", "Gender", "Details",
+                     "Birth Date", "Death Date"])
+
+    def _person_details(p):
+        return p["notes"] or ""
 
     for p in people_list:
         if p["id"] not in children_ids:
             dn = p["display_name"].replace("\n", "\\n")
-            writer.writerow([dn, "Earliest Ancestor", "", p["sex"], p["notes"] or ""])
+            writer.writerow([dn, "Earliest Ancestor", "", p["sex"],
+                             _person_details(p),
+                             p.get("birth_date") or "",
+                             p.get("death_date") or ""])
 
     for e in edges:
         p1 = id_to_person.get(e["from_id"])
@@ -915,9 +923,12 @@ def tree_export_csv(tree_id: str, user=Depends(auth.get_current_user),
         dn1 = p1["display_name"].replace("\n", "\\n")
         dn2 = p2["display_name"].replace("\n", "\\n")
         if e["type"] == "PARENT_OF":
-            writer.writerow([dn2, "Child", dn1, p2["sex"], p2["notes"] or ""])
+            writer.writerow([dn2, "Child", dn1, p2["sex"],
+                             _person_details(p2),
+                             p2.get("birth_date") or "",
+                             p2.get("death_date") or ""])
         elif e["type"] == "SPOUSE_OF":
-            writer.writerow([dn1, "Spouse", dn2, "", ""])
+            writer.writerow([dn1, "Spouse", dn2, "", "", "", ""])
 
     return Response(
         content=buf.getvalue(), media_type="text/csv",
@@ -1014,8 +1025,8 @@ def add_person(body: schemas.PersonCreate, conn=Depends(get_conn)):
 def add_rel(body: schemas.RelCreate, conn=Depends(get_conn)):
     if body.type == "PARENT_OF":
         child_parents = crud.count_parents(conn, body.to_person_id)
-        if child_parents >= 1:
-            raise HTTPException(400, "This person already has a parent. Use 'Replace Parent' to change it.")
+        if child_parents >= 2:
+            raise HTTPException(400, "This person already has two parents. Use 'Replace Parent' to change them.")
     if body.type == "SPOUSE_OF":
         from_spouses = crud.count_spouses(conn, body.from_person_id)
         to_spouses = crud.count_spouses(conn, body.to_person_id)
