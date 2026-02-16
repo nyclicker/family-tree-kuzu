@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends, UploadFile, File, Request, HTTPException
 from fastapi.responses import FileResponse, Response, HTMLResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
-from .db import get_database, get_conn
+from .db import get_database, get_conn, check_db_integrity, write_sentinel
 from . import crud, schemas, graph, sharing, trees, groups, auth, changelog
 from .importer import import_csv_text, import_db_file
 
@@ -143,6 +143,7 @@ async def lifespan(app):
     db = get_database()
     import kuzu
     conn = kuzu.Connection(db)
+    check_db_integrity(conn)
     _run_migration(conn)
     yield
 
@@ -175,6 +176,10 @@ def register(body: schemas.RegisterRequest, conn=Depends(get_conn)):
         user = auth.create_user(conn, body.email, body.display_name, body.password, is_admin)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+    # First user registered — write sentinel so we can detect future DB resets
+    if is_admin:
+        write_sentinel()
 
     # If first user and there's a default tree with no owner, assign ownership
     if is_admin:

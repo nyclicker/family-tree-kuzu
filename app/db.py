@@ -1,10 +1,59 @@
 """KuzuDB embedded graph database connection."""
 import os
+import logging
 import kuzu
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).resolve().parent.parent / "graph_data"))
 _database = None
+_SENTINEL_FILE = ".db_initialized"
+
+
+def _sentinel_path():
+    return DB_PATH.parent / _SENTINEL_FILE
+
+
+def write_sentinel():
+    """Write a sentinel file indicating the database has been initialized with data.
+    Called after the first user registers so we can detect silent DB resets."""
+    try:
+        path = _sentinel_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("initialized")
+        logger.info("Database sentinel written to %s", path)
+    except Exception as e:
+        logger.warning("Could not write DB sentinel: %s", e)
+
+
+def check_db_integrity(conn):
+    """Check if the database was silently reset (e.g., persistent disk not mounted).
+    If a sentinel file exists but the DB has 0 users, data was likely lost."""
+    sentinel = _sentinel_path()
+    if not sentinel.exists():
+        return  # First-time setup, nothing to check
+    # Sentinel exists — we previously had data. Verify users still exist.
+    try:
+        result = conn.execute("MATCH (u:User) RETURN count(*)")
+        count = result.get_next()[0] if result.has_next() else 0
+        if count == 0:
+            logger.critical(
+                "DATABASE INTEGRITY CHECK FAILED: Sentinel file exists at %s "
+                "but database has 0 users. The persistent disk may not be mounted. "
+                "Refusing to serve requests to prevent data loss.",
+                sentinel
+            )
+            raise RuntimeError(
+                "Database was previously initialized but now has 0 users. "
+                "This likely means the persistent disk is not mounted. "
+                "Check your deployment configuration."
+            )
+        logger.info("Database integrity check passed: %d users found", count)
+    except RuntimeError:
+        raise
+    except Exception as e:
+        logger.warning("Could not run DB integrity check: %s", e)
 
 
 def get_database():

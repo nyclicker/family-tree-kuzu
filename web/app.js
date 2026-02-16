@@ -746,6 +746,13 @@ function runFamilyLayout(animate) {
     }
   });
 
+  // Deduplicate: when a child appears under two parents, only the "primary"
+  // parent (the one recorded in parentOf) keeps the child for layout purposes.
+  // This prevents duplicate subtrees when spouses both have PARENT_OF edges.
+  for (const id in childrenOf) {
+    childrenOf[id] = childrenOf[id].filter(kid => parentOf[kid] === id);
+  }
+
   for (const id in childrenOf) {
     childrenOf[id].sort((a, b) => {
       const na = cy.getElementById(a).data('label') || '';
