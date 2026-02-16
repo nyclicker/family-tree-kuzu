@@ -77,6 +77,16 @@ def get_person(conn: kuzu.Connection, person_id: str, tree_id: str = ""):
 def create_relationship(conn: kuzu.Connection, from_id: str, to_id: str, rel_type: str):
     if rel_type not in VALID_REL_TYPES:
         raise ValueError(f"Invalid relationship type: {rel_type}")
+    # Prevent duplicate edges
+    if _edge_exists(conn, from_id, to_id, rel_type):
+        # Return existing edge info instead of creating a duplicate
+        result = conn.execute(
+            f"MATCH (a:Person)-[r:{rel_type}]->(b:Person) "
+            f"WHERE a.id = $fid AND b.id = $tid RETURN r.id",
+            {"fid": from_id, "tid": to_id}
+        )
+        existing_id = result.get_next()[0] if result.has_next() else str(uuid.uuid4())
+        return {"id": existing_id, "from_person_id": from_id, "to_person_id": to_id, "type": rel_type}
     rid = str(uuid.uuid4())
     conn.execute(
         f"MATCH (a:Person), (b:Person) WHERE a.id = $fid AND b.id = $tid "

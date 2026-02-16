@@ -1923,10 +1923,30 @@ async function loadGraph() {
   });
   for (const child in childParents) {
     const edges = childParents[child];
-    if (edges.length === 2) {
-      const p1 = edges[0].data.source, p2 = edges[1].data.source;
-      if (spouseOf[p1] === p2) {
-        skipEdges.add(edges[1].data.id);
+    if (edges.length < 2) continue;
+    // Find unique parent IDs and their edges
+    const parentMap = {};
+    for (const e of edges) {
+      const pid = e.data.source;
+      if (!parentMap[pid]) parentMap[pid] = [];
+      parentMap[pid].push(e);
+    }
+    const uniqueParents = Object.keys(parentMap);
+    // Skip duplicate edges from the same parent (keep first)
+    for (const pid of uniqueParents) {
+      for (let i = 1; i < parentMap[pid].length; i++) {
+        skipEdges.add(parentMap[pid][i].data.id);
+      }
+    }
+    // If two parents are spouses, skip the second parent's edge
+    for (let i = 0; i < uniqueParents.length; i++) {
+      for (let j = i + 1; j < uniqueParents.length; j++) {
+        if (spouseOf[uniqueParents[i]] === uniqueParents[j]) {
+          // Skip all edges from the second spouse to this child
+          for (const e of parentMap[uniqueParents[j]]) {
+            skipEdges.add(e.data.id);
+          }
+        }
       }
     }
   }

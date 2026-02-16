@@ -31,6 +31,7 @@ def build_graph(conn: kuzu.Connection, dataset: str | None = None, tree_id: str 
         node_ids.add(row[0])
 
     edges = []
+    seen_edges = set()  # (source, target, type) to deduplicate
     for rel_type in ["PARENT_OF", "SPOUSE_OF"]:
         result = conn.execute(
             f"MATCH (a:Person)-[r:{rel_type}]->(b:Person) RETURN r.id, a.id, b.id"
@@ -40,6 +41,17 @@ def build_graph(conn: kuzu.Connection, dataset: str | None = None, tree_id: str 
             # When filtering by dataset/tree, only include edges between nodes in the set
             if (dataset or tree_id) and (row[1] not in node_ids or row[2] not in node_ids):
                 continue
+            # Deduplicate: skip duplicate edges between the same pair
+            edge_key = (row[1], row[2], rel_type)
+            if edge_key in seen_edges:
+                continue
+            seen_edges.add(edge_key)
+            # For symmetric relations, also check reverse
+            if rel_type == "SPOUSE_OF":
+                reverse_key = (row[2], row[1], rel_type)
+                if reverse_key in seen_edges:
+                    continue
+                seen_edges.add(reverse_key)
             edges.append({"data": {
                 "id": row[0], "source": row[1], "target": row[2], "type": rel_type
             }})
